@@ -1,7 +1,7 @@
 ---
-title: "Working with Ray-Tracing Output Files in WPIT"
+title: "Ray-Tracing Post-Processing with WPIT RayUtils_mod"
 sidebarTitle: "Ray Tracing"
-description: "How to read, append, and analyse ray-tracing .ray files using WPIT's RayUtils_mod: resonance conditions, Landau damping, and wave amplitude enhancement factors."
+description: "Read, append, and analyse .ray files with WPIT's RayUtils_mod: covering Landau damping, resonance conditions, and wave-amplitude enhancement factors."
 ---
 
 WPIT's `LandauDamp_mod.RayUtils_mod` sub-module provides a complete pipeline for post-processing ray-tracing output produced by external ray-tracing codes. Starting from a whitespace-delimited `.ray` file, you can compute Landau damping along the ray path, enrich the file with derived quantities such as the Stix parameters, wave normal angles, and L-shell coordinates, then evaluate resonance conditions and wave-amplitude enhancement factors for any pitch-angle population. This page covers the file format, each utility function, and representative code examples.
@@ -56,7 +56,7 @@ The species order is by convention: electrons (`qs1`, `ms1`, `Ns1`), H⁺ (`qs2`
 
 ## `read_input_ray`
 
-`read_input_ray(ray_file_name)` reads a raw `.ray` file and returns a pandas `DataFrame` with all 36 columns named according to the convention above, plus a derived `freq` column (Hz).
+`read_input_ray(ray_file_name)` reads a raw `.ray` file and returns a pandas `DataFrame` with 34 of the 36 raw columns (all except the leading `ray` index and `ray_stop` flag) plus a derived `freq` column (Hz), giving 35 columns total.
 
 ```python
 from WPIT.LandauDamp_mod.RayUtils_mod import read_input_ray
@@ -65,7 +65,7 @@ ray_file = "Module_descriptions/example_rays/WPIT2_freq2000_psi0.0_L5_lamda_0_mo
 df = read_input_ray(ray_file)
 
 print(df.columns.tolist())
-# ['ray', 'ray_stop', 'time', 'posx', 'posy', 'posz',
+# ['time', 'posx', 'posy', 'posz',
 #  'vprelx', 'vprely', 'vprelz', 'vgrelx', 'vgrely', 'vgrelz',
 #  'nx', 'ny', 'nz', 'Bx', 'By', 'Bz', 'w', 'Nspec',
 #  'qs1', 'qs2', 'qs3', 'qs4', 'ms1', 'ms2', 'ms3', 'ms4',

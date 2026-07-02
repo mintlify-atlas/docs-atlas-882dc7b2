@@ -1,14 +1,14 @@
 ---
 title: "WPI_mod: Wave-Particle Interaction Modules Overview"
 sidebarTitle: "Overview"
-description: "Survey of WPIT's WPI_mod package: three sub-modules covering oblique whistler–electron, oblique EMIC–ion, and parallel EMIC wave-particle interactions."
+description: "Survey of WPIT's WPI_mod package: three sub-modules for oblique whistler–electron, oblique EMIC–ion, and parallel EMIC wave-particle interactions."
 ---
 
-The `WPI_mod` package provides the equations of motion needed to trace a single charged particle through a magnetospheric wave field. Each sub-module targets a specific wave mode and particle species combination, supplying time-derivative functions that can be integrated with any standard ODE solver (e.g., `scipy.integrate.solve_ivp`). All three sub-modules share the same design pattern: a `wpi_params` helper that computes pre-requisite parameters from the instantaneous wave and particle state, followed by a family of time-derivative functions, and a set of nonlinear trapping diagnostics (`nonlinear_H`, `nonlinear_S`, `nonlinear_theta`).
+The `WPI_mod` package provides the equations of motion needed to trace a single charged particle through a magnetospheric wave field. Each sub-module targets a specific wave mode and particle species combination, supplying time-derivative functions that can be integrated with any standard ODE solver (e.g., `scipy.integrate.solve_ivp`). The oblique sub-modules (`whistler_electron_mod` and `EMIC_ion_mod`) include a `wpi_params` helper that pre-computes wave-coupling parameters from the instantaneous particle and wave state. All three sub-modules provide a family of time-derivative functions and a set of nonlinear trapping diagnostics (`nonlinear_H`, `nonlinear_S`, `nonlinear_theta`); `parallel_EMIC_mod` omits `wpi_params` because the parallel geometry removes the need for Bessel-function decomposition.
 
 ## Package layout
 
-```
+```text
 WPIT.WPI_mod
 ├── whistler_electron_mod   # Oblique whistler–electron interactions
 ├── EMIC_ion_mod            # Oblique EMIC–ion interactions
@@ -25,7 +25,7 @@ import WPIT.WPI_mod.parallel_EMIC_mod as par_emic
 
 # Or import individual functions
 from WPIT.WPI_mod.whistler_electron_mod import wpi_params, dzdt, dppardt
-from WPIT.WPI_mod.EMIC_ion_mod import wpi_params, dkpardt, dwcdt
+from WPIT.WPI_mod.EMIC_ion_mod import wpi_params, dwcdt
 from WPIT.WPI_mod.parallel_EMIC_mod import dzdt, nonlinear_H, nonlinear_S
 ```
 
@@ -66,7 +66,7 @@ All momentum values use SI units (kg m s⁻¹). Wave field amplitudes are in SI 
 | Species | Electrons | Ions | Ions or electrons |
 | Particle mass | `const.me` | User-supplied `mi` | User-supplied `m` |
 | Oblique geometry | ✓ (kx, kz) | ✓ (kper, kpar) | ✗ (parallel only) |
-| `dkpardt` | ✗ | ✓ | ✗ |
+| `dkpardt` | ✗ | ✓ (direct import only) | ✗ |
 | `dwcdt` | ✗ | ✓ | ✗ |
 | `wpi_params` helper | ✓ | ✓ | ✗ (not needed) |
 

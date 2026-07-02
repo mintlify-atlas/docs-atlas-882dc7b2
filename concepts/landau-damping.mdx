@@ -39,6 +39,7 @@ A(s) = A(0) × exp(−∫₀ˢ κᵢ(s') ds')
 | `nx`, `ny`, `nz` | Refractive index vector components |
 | `Bx`, `By`, `Bz` | Background magnetic field (T) |
 | `w` | Wave angular frequency (rad/s) |
+| `Nspec` | Number of plasma species |
 | `qs1–qs4` | Species charges (C) |
 | `ms1–ms4` | Species masses (kg) |
 | `Ns1–Ns4` | Species number densities (m⁻³) |
@@ -86,7 +87,7 @@ An anisotropic Maxwellian with a loss-cone modification, suitable for the outer 
 - Loss-cone parameter: β = 0.01
 
 ```
-f(v⊥, v‖) = nₕ / (2π^(3/2) U‖ U⊥²) × exp(−u‖²/2U‖²) × 1/(1−β) × [exp(−u⊥²/2U⊥²) − exp(−u⊥²/2βU⊥²)]
+f(v⊥, v‖) = nₕ / (3π U‖ U⊥²) × exp(−u‖²/2U‖²) × 1/(1−β) × [exp(−u⊥²/2U⊥²) − exp(−u⊥²/2βU⊥²)]
 ```
 
 where (u‖, u⊥) = γ (v‖, v⊥) are the relativistic four-velocities.
@@ -128,6 +129,10 @@ The plasmapause location L_pp = 5.6 − 0.46 Kp_max is used to compute the blend
 ### Golden2 — `ld.distribution_golden2(vperp, vpar)`
 
 A pre-configured version of the Golden distribution with fixed parameters (Kp_max = 5, L_meas = 2), useful for a quick comparison without having to supply storm-time indices.
+
+<Note>
+When `landau_damping` is called with `distr='Golden'`, it internally uses `distribution_golden2` (the pre-configured variant with fixed Kp_max = 5, L_meas = 2). Call `ld.distribution_golden(vperp, vpar, kpmax, Lmeas)` directly if you need activity-dependent blending weights.
+</Note>
 
 <Tip>
 For a first estimate, use `'Bimaxw'` (bi-Maxwellian) to check qualitative behaviour. For quantitative comparisons with observations in the outer radiation belt, `'Golden'` or `'Bell'` are more physically motivated. The Bortnik distribution gives the softest spectrum and produces the most gradual damping.

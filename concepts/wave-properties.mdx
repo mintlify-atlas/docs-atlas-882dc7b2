@@ -46,13 +46,13 @@ print(f"R={R:.4f}  L={L_stix:.4f}  P={P:.4f}  S={S:.4f}  D={D:.4f}")
 
 Internally the function computes plasma and cyclotron frequencies for each ion species using `env.const`.
 
-### `wave.stix_parameters_warm(w, Ne, NH, NHe, NO, B0, T_par, T_per)`
+### `wave.stix_parameters_warm(S_cold, D_cold, P_cold, Te, Ti, mu_warm, Ke, KH, KHe, KO)`
 
-Warm-plasma corrected Stix parameters accounting for finite temperature anisotropy. Returns the same five parameters but with thermal corrections included in the off-diagonal dielectric tensor components.
+Warm-plasma corrected Stix parameters. Takes the cold-plasma S, D, P values (from `wave.stix_parameters`) plus electron temperature `Te`, ion temperature `Ti`, the warm-plasma parameter `mu_warm`, and the species thermal correction factors `Ke`, `KH`, `KHe`, `KO`. Returns the same five parameters with thermal corrections included in the off-diagonal dielectric tensor components.
 
-### `wave.cold_dielectric_tensor(S, D, P)`
+### `wave.cold_dielectric_tensor(w, wce, wpe, wcH, wpH, wcHe, wpHe, wcO, wpO)`
 
-Assembles the 3×3 cold-plasma dielectric tensor from the Stix parameters:
+Assembles the full 3×3 cold-plasma dielectric tensor from the wave frequency and the electron and ion cyclotron/plasma frequencies. Internally computes the Stix R, L, P, S, D parameters and returns the tensor:
 
 ```
 K = [ S   -iD   0 ]
@@ -60,9 +60,9 @@ K = [ S   -iD   0 ]
     [ 0     0   P ]
 ```
 
-### `wave.warm_dielectric_tensor(S_warm, D_warm, P_warm)`
+### `wave.warm_dielectric_tensor(w, wce, wpe, wcH, wpH, wcHe, wpHe, wcO, wpO, psi)`
 
-Assembles the warm-plasma dielectric tensor using the corrected Stix parameters.
+Assembles the warm-plasma dielectric tensor. Takes the same frequency parameters as the cold tensor plus the wave normal angle `psi` (rad) for the warm-plasma corrections.
 
 ## Refractive Index
 
@@ -87,31 +87,31 @@ musq_plus, musq_minus, ref_ind, kappa, kappa_par, kappa_per = \
 - `kappa_par` — parallel component κ‖ (rad/m)
 - `kappa_per` — perpendicular component κ⊥ (rad/m)
 
-### `wave.refr_index_full(w, S, D, P, theta)`
+### `wave.refr_index_full(theta, w, S, P, R, L)`
 
-Full cold-plasma refractive index from the Stix tensor, valid for oblique propagation and multi-species plasmas. Solves the biquadratic dispersion relation using S, D, P.
+Full cold-plasma refractive index from the Stix tensor, valid for oblique propagation and multi-species plasmas. Takes the wave normal angle `theta` (rad), wave frequency `w` (rad/s), and the four Stix parameters S, P, R, L. Solves the biquadratic dispersion relation.
 
-### `wave.refr_index_warm(w, S_warm, D_warm, P_warm, theta)`
+### `wave.refr_index_warm(K_e, K_H, K_He, K_O, psi, Te, Ti, K110, K220, K330, K120, w)`
 
-Refractive index including warm plasma corrections.
+Refractive index including warm-plasma corrections. Takes the species thermal correction tensors (K_e, K_H, K_He, K_O), wave normal angle `psi`, electron and ion temperatures, the off-diagonal tensor elements (K110, K220, K330, K120), and the wave frequency `w`.
 
-### `wave.refr_index_parallel_EMIC(w, wci, wpi)`
+### `wave.refr_index_parallel_EMIC(w, wpe, wce, wpH, wcH, wpO, wcO, wpHe, wcHe)`
 
-Refractive index for EMIC waves propagating strictly parallel to the background field. This is a simplified form used in `parallel_EMIC_mod`.
+Refractive index for EMIC waves propagating strictly parallel to the background field. Requires the plasma and cyclotron frequencies for electrons and for each ion species (H⁺, O⁺, He⁺). Used internally by `parallel_EMIC_mod`.
 
 ## Dispersion Relations
 
-WPIT provides individual dispersion relation functions for the four principal magnetoplasma modes. Each takes the Stix parameters and returns the squared refractive index µ²:
+WPIT provides individual dispersion relation functions for the principal magnetoplasma modes. Each returns the squared refractive index µ²:
 
-| Function | Mode | Propagation |
-|---|---|---|
-| `wave.dispersion_R(w, R)` | R-mode (right-hand circularly polarized) | Parallel |
-| `wave.dispersion_L(w, L)` | L-mode (left-hand circularly polarized) | Parallel |
-| `wave.dispersion_O(w, P)` | O-mode (ordinary wave) | Perpendicular |
-| `wave.dispersion_X(w, R, L, S, P)` | X-mode (extraordinary wave) | Perpendicular |
-| `wave.dispersion_light(w)` | Light wave in vacuum | Any |
+| Function | Signature | Mode | Propagation |
+|---|---|---|---|
+| `wave.dispersion_R` | `(w, wpe, wce, wpH, wcH, wpHe, wcHe, wpO, wcO)` | R-mode (right-hand circularly polarized) | Parallel |
+| `wave.dispersion_L` | `(w, wpe, wce, wpH, wcH, wpHe, wcHe, wpO, wcO)` | L-mode (left-hand circularly polarized) | Parallel |
+| `wave.dispersion_O` | `(w, wpe, wpH, wpHe, wpO)` | O-mode (ordinary wave) | Perpendicular |
+| `wave.dispersion_X` | `(w, wpe, wlh)` | X-mode (extraordinary wave) | Perpendicular |
+| `wave.dispersion_light` | `(w, wpe, wce)` | Light wave in plasma | Any |
 
-Cutoff frequencies (where µ² → 0) are returned by `wave.cutoff_R(R)` and `wave.cutoff_L(L)`.
+All dispersion functions take plasma/cyclotron frequencies for each relevant species rather than pre-computed Stix parameters. Cutoff frequencies (where µ² → 0) are returned by `wave.cutoff_R(wce, wpe)` and `wave.cutoff_L(wce, wpe)`.
 
 ## Wave Amplitude Models
 
@@ -135,24 +135,22 @@ Bxw, Byw_out, Bzw, Exw, Eyw, Ezw = \
 
 Alternative polarization parameterization.
 
-### Jasna Model — `wave.wave_amplitudes_jasna(mu, P, D, S, Byw, theta)`
+### Jasna Model — `wave.wave_amplitudes_jasna(P, S, D, theta, ref, power)`
 
-Third parameterization, used primarily for comparison studies.
+Alternative parameterization after Jasna et al. (1992). Instead of a prescribed By amplitude, it takes the wave Poynting flux `power` (mW/m²) and the refractive index `ref`, making it more convenient when wave intensity data are given in power units.
 
 ## Wave Packet Shapes
 
-Wave packets in WPIT are implemented as envelope functions that modulate the wave amplitude as a function of position along the field line. Three shapes are available:
+Wave packets in WPIT are implemented as envelope functions that modulate the wave amplitude as a function of magnetic latitude along the field line. All three functions take the peak wave amplitude `Bw0` (T) and the current magnetic latitude `lamda` (radians) and return the local amplitude `Bwave`:
 
-| Function | Shape |
-|---|---|
-| `wave.wave_packet_gauss(s, s0, sigma)` | Symmetric Gaussian envelope |
-| `wave.wave_packet_one_sided(s, s0, sigma)` | One-sided (asymmetric) Gaussian |
-| `wave.wave_packet_two_sided(s, s0, sigma1, sigma2)` | Two-sided Gaussian with independent widths |
-
-All three take the field-line coordinate `s`, packet centre `s0`, and one or two width parameters `sigma`.
+| Function | Signature | Shape |
+|---|---|---|
+| `wave.wave_packet_gauss` | `(Bw0, lamda, lamda_range)` | Symmetric Gaussian; `lamda_range` is the latitudinal half-width |
+| `wave.wave_packet_one_sided` | `(Bw0, lamda, shape, location, direction)` | Hyperbolic-tangent step; `shape` controls edge sharpness, `location` sets the HWHM latitude, `direction` is `'north'` or `'south'` |
+| `wave.wave_packet_two_sided` | `(Bw0, lamda, shape, location)` | Symmetric two-sided taper using opposing hyperbolic-tangent steps |
 
 <Accordion title="Why different packet shapes?">
-Chorus wave elements observed by spacecraft often show asymmetric amplitude envelopes. The one-sided and two-sided Gaussians capture rising-tone or falling-tone morphologies where the leading and trailing edges of the packet have different characteristic lengths. The symmetric Gaussian is appropriate for monochromatic test-wave studies.
+Chorus wave elements observed by spacecraft often show asymmetric amplitude envelopes. The one-sided packet models a wave train that is switched on or off at a particular latitude (e.g., a chorus element growing away from the equator in one direction only). The two-sided packet is symmetric about the equator and is appropriate for standing-wave or monochromatic test-wave studies where the packet decays equally in both directions.
 </Accordion>
 
 ## Resonance
@@ -173,9 +171,9 @@ v_par, v_per, v_tot, E_res, gamma_res = wave.resonant_velocity(
 print(f"Resonant energy: {E_res / env.const.qe / 1e3:.1f} keV")
 ```
 
-### Resonance Angle — `wave.res_angle(w, wce, wpe, theta)`
+### Resonance Angle — `wave.res_angle(P, S)`
 
-The resonance (Storey) cone angle, which sets the maximum wave normal angle for propagation of whistler-mode waves.
+The resonance (Storey) cone angle, which sets the maximum wave normal angle for propagation of whistler-mode waves. Takes the Stix `P` and `S` parameters (from `wave.stix_parameters`) and returns the resonance angle in radians: tan²θ_res = −P/S.
 
 ### Gendrin Angle — `wave.gendrin_angle(w_wave, wlhr, wce)`
 

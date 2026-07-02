@@ -1,7 +1,7 @@
 ---
 title: "Nonlinear Wave-Particle Interaction Analysis in WPIT"
 sidebarTitle: "Nonlinear Analysis"
-description: "Characterise linear vs. nonlinear wave-particle interaction regimes using WPIT's S and H parameters, phase-angle evolution, and C0/C1 coefficient functions."
+description: "Characterise linear and nonlinear WPI regimes using WPIT's S and H parameters, phase-angle evolution, and C0, C1m, C1p coefficient functions."
 ---
 
 Determining whether a wave-particle interaction is linear (quasi-linear diffusion) or nonlinear (phase trapping, bunching) is a critical first step before choosing a simulation strategy. WPIT provides dedicated functions — based on the Bortnik (2004) thesis formalism — that compute the nonlinearity parameter S, the inhomogeneity parameter H, the phase-angle evolution, and the auxiliary coefficients C0, C1m, and C1p. These routines exist in both `whistler_electron_mod` (electrons interacting with whistler-mode waves) and `EMIC_ion_mod` (ions interacting with EMIC waves), with slightly different function signatures reflecting the different polarisation geometry.
@@ -67,8 +67,8 @@ beta, BwR, BwL, EwR, EwL, pwR, pwL, wR, wL = wpi_params_emic(
     Exw_arg,     # Ex (V/m)
     Eyw_arg,     # Ey (V/m)
     Bxw_arg,     # Bx (T)
-    Byw_arg      # By (T)
-    gamma_arg,   # Lorentz factor
+    Byw_arg,     # By (T)
+    gamma_arg    # Lorentz factor
 )
 ```
 

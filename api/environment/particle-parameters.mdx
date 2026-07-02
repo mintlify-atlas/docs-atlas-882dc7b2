@@ -188,7 +188,7 @@ Tb_vals = [env.T_bounce(L, v_total, a) for a in angles]
 Calculates the azimuthal drift period of a magnetically trapped particle — the time for a particle to complete one full drift around Earth due to the gradient and curvature drift of the magnetic field. The formula accounts for the pitch-angle dependence of the drift velocity.
 
 $$
-T_d = \frac{2\pi q B R_E^3}{m v^2} \cdot \frac{1}{L R_E} \cdot \left[1 - \frac{1}{3}\sin^{0.62}\!\alpha_{\text{eq}}\right]^{-1}
+T_d = \frac{2\pi q B R_E^3}{m v^2} \cdot \frac{1}{L R_E} \cdot \left[1 - \frac{1}{3}\sin^{0.62}\!\alpha_{\text{eq}}\right]
 $$
 
 **References:**
@@ -242,7 +242,7 @@ print(f"Drift period: {Td / 3600:.2f} hours")
 ```
 
 <Note>
-  The function internally uses `env.const.qe` (electron charge) for the charge factor regardless of the species passed. Verify source code behaviour when applying to ion drift calculations.
+  `T_drift` hardcodes `env.const.qe` as the charge in the drift formula. It is designed for electrons. Do not use it directly for ion drift period calculations without modifying the charge term.
 </Note>
 
 ---

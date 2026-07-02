@@ -61,7 +61,7 @@ S, D, P, R, L = wave.stix_parameters(
 </ResponseField>
 
 <ResponseField name="Pstix" type="float">
-  Stix P parameter — parallel (to **B₀**) dielectric response; equals `1 − Σ ωₚₛ² / ω²`.
+  Stix P parameter — parallel (to **B₀**) dielectric response.
 </ResponseField>
 
 <ResponseField name="Rstix" type="float">
@@ -93,7 +93,7 @@ print(f"S={S:.4f}  D={D:.4f}  P={P:.4f}  R={R:.4f}  L={L:.4f}")
 
 ## `stix_parameters_warm`
 
-Applies finite-temperature (warm plasma) corrections to the cold Stix parameters using the warm dielectric tensor components computed by `warm_dielectric_tensor`. The correction is proportional to the dimensionless thermal parameter τ = (k_B T)/(m c²) × η².
+Applies finite-temperature (warm plasma) corrections to the cold Stix parameters using the warm dielectric tensor components computed by `warm_dielectric_tensor`. The correction is proportional to the dimensionless thermal parameter τ = (k_B T / m c²) × η².
 
 **Reference:** Maxworth, A. and Gołkowski, M. (2017). *Journal of Geophysical Research: Space Physics* 122, 7323–7335.
 
@@ -126,7 +126,7 @@ S_w, D_w, P_w, R_w, L_w = wave.stix_parameters_warm(
 </ParamField>
 
 <ParamField path="mu_warm" type="float" required>
-  Warm-plasma refractive index η (dimensionless), used to form τ = (k_B T / m c²) η².
+  Warm-plasma refractive index η (dimensionless), used to form τ = (k_B T / m c²) × η².
 </ParamField>
 
 <ParamField path="Ke" type="list[complex]" required>
@@ -189,16 +189,11 @@ S_w, D_w, P_w, R_w, L_w = wave.stix_parameters_warm(
 
 ## `cold_dielectric_tensor`
 
-Computes all nine components of the cold-plasma dielectric tensor K for a multi-species plasma. The tensor is Hermitian — K₁₃ = K₂₃ = K₃₁ = K₃₂ = 0 for a cold plasma in a uniform background field aligned with z, and K₁₁ = K₂₂ while K₂₁ = −K₁₂.
+Computes all nine components of the cold-plasma dielectric tensor K for a multi-species plasma. The tensor is Hermitian — K13 = K23 = K31 = K32 = 0 for a cold plasma in a uniform background field aligned with z, and K11 = K22 while K21 = −K12.
 
 **Reference:** Maxworth, A. S., et al. (2020). *Journal of Geophysical Research: Space Physics* 125(4), e2019JA027154.
 
 ```python
-K_e, K_H, K_He, K_O = wave.warm_dielectric_tensor(
-    w_wave, wce_arg, wpe_arg,
-    wcH_arg, wpH_arg, wcHe_arg, wpHe_arg, wcO_arg, wpO_arg, psi_arg
-)
-
 K11, K12, K13, K21, K22, K23, K31, K32, K33 = wave.cold_dielectric_tensor(
     w_wave, wce_arg, wpe_arg,
     wcH_arg, wpH_arg, wcHe_arg, wpHe_arg, wcO_arg, wpO_arg
@@ -246,9 +241,9 @@ K11, K12, K13, K21, K22, K23, K31, K32, K33 = wave.cold_dielectric_tensor(
 ### Returns
 
 <ResponseField name="K_11 … K_33" type="complex">
-  Nine individual tensor components. For a cold plasma with **B₀** ∥ ẑ the nonzero
-  independent components are K₁₁ (= K₂₂), K₁₂ (purely imaginary), and K₃₃.
-  All off-diagonal z-coupling terms (K₁₃, K₂₃, K₃₁, K₃₂) are identically zero.
+  Nine individual tensor components. For a cold plasma with **B₀** aligned with ẑ the nonzero
+  independent components are K11 (= K22), K12 (purely imaginary), and K33.
+  All off-diagonal z-coupling terms (K13, K23, K31, K32) are identically zero.
 </ResponseField>
 
 ### Example
@@ -276,7 +271,7 @@ K11, K12, K13, K21, K22, K23, K31, K32, K33 = wave.cold_dielectric_tensor(
 
 ## `warm_dielectric_tensor`
 
-Computes warm-plasma dielectric tensor corrections for each ion species and electrons. The tensor components account for finite Larmor radius effects via the wave normal angle `psi_arg`. The function returns four lists, each a 9-element flat array indexed as [K₁₁, K₁₂, K₁₃, K₂₁, K₂₂, K₂₃, K₃₁, K₃₂, K₃₃].
+Computes warm-plasma dielectric tensor corrections for each ion species and electrons. The tensor components account for finite Larmor radius effects via the wave normal angle `psi_arg`. The function returns four lists, each a 9-element flat array indexed as [K11, K12, K13, K21, K22, K23, K31, K32, K33].
 
 **Reference:** Maxworth & Gołkowski (2017). *JGR: Space Physics* 122, 7323–7335.
 
@@ -366,7 +361,7 @@ print("K33_electron =", K_e[8])
 
 ## `dispersion_R`
 
-Evaluates the R-mode (right-hand, extraordinary, whistler-branch) dispersion relation for a multi-species cold plasma. The R-mode is right-hand circularly polarised for parallel propagation and connects to the whistler mode at sub-electron-cyclotron frequencies.
+Evaluates the R-mode (right-hand, whistler-branch) dispersion relation for a multi-species cold plasma. The R-mode is right-hand circularly polarised for parallel propagation and connects to the whistler mode at sub-electron-cyclotron frequencies.
 
 **Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
 
@@ -440,8 +435,8 @@ print(f"eta^2 = {nsq:.2f},  kappa = {kappa:.4e} m^-1")
 ```
 
 <Note>
-  The R-mode becomes evanescent (η² < 0) below the R-mode cutoff frequency ω_R and above
-  the electron cyclotron frequency ω_ce. Use `cutoff_R` to find the lower propagation boundary.
+  The R-mode becomes evanescent (η² less than 0) below the R-mode cutoff frequency and above
+  the electron cyclotron frequency. Use `cutoff_R` to find the lower propagation boundary.
 </Note>
 
 ---
@@ -518,14 +513,14 @@ nsq, kappa = wave.dispersion_L(w_emic, wpe, wce, wpH, wcH, wpHe, wcHe, wpO, wcO)
 
 <Note>
   The L-mode resonates (η² → ∞) at each ion cyclotron frequency. The wave is evanescent
-  below the L-mode cutoff ω_L. Use `cutoff_L` to locate this boundary.
+  below the L-mode cutoff. Use `cutoff_L` to locate this boundary.
 </Note>
 
 ---
 
 ## `dispersion_O`
 
-Evaluates the O-mode (ordinary mode, electric field polarised parallel to **B₀**) dispersion relation. The O-mode is independent of the magnetic field; it propagates when ω > ωₚₑ (total).
+Evaluates the O-mode (ordinary mode, electric field polarised parallel to **B₀**) dispersion relation. The O-mode is independent of the magnetic field; it propagates when ω exceeds the total plasma frequency.
 
 **Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
 
@@ -629,16 +624,11 @@ w   = 2 * np.pi * 5e3
 nsq, kappa = wave.dispersion_X(w, wpe, wlh)
 ```
 
-<Note>
-  The argument labelled `wuhr_arg` in the task spec maps to `wlh` in the actual source code —
-  the function takes the **lower** hybrid resonance frequency, not the upper hybrid resonance.
-</Note>
-
 ---
 
 ## `dispersion_light`
 
-Returns the squared refractive index and wave number for a free-space electromagnetic (light) wave in an unmagnetised plasma. This is equivalent to the O-mode for electron-only plasma with η² = 1 − ωₚₑ²/ω².
+Returns the squared refractive index and wave number for a free-space electromagnetic (light) wave. This is equivalent to the O-mode for an electron-only plasma with η² = 1 − ωₚₑ²/ω². The function accepts `wce` for interface consistency but does not use it in the calculation.
 
 **Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
 
@@ -657,8 +647,8 @@ nsq, kappa = wave.dispersion_light(w, wpe, wce)
 </ParamField>
 
 <ParamField path="wce" type="float" required>
-  Electron cyclotron angular frequency [rad s⁻¹]. Accepted but not used in the calculation;
-  included for interface consistency.
+  Electron cyclotron angular frequency [rad s⁻¹]. Accepted for interface consistency
+  but not used in the calculation.
 </ParamField>
 
 ### Returns
@@ -688,8 +678,8 @@ nsq, kappa = wave.dispersion_light(w, wpe, wce)
 
 ## `cutoff_L`
 
-Computes the L-mode cutoff angular frequency ω_L, below which the L mode is evanescent.
-The formula is ω_L = ½(−ω_ce + √(ω_ce² + 4 ω_pe²)).
+Computes the L-mode cutoff angular frequency, below which the L mode is evanescent.
+The formula is `omega_L = 0.5 * (−wce + sqrt(wce² + 4 * wpe²))`.
 
 **Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
 
@@ -730,8 +720,8 @@ print(f"L cutoff: {omega_Lc / (2*np.pi):.3e} Hz")
 
 ## `cutoff_R`
 
-Computes the R-mode cutoff angular frequency ω_R, below which the R mode is evanescent.
-The formula is ω_R = ½(ω_ce + √(ω_ce² + 4 ω_pe²)).
+Computes the R-mode cutoff angular frequency, below which the R mode is evanescent.
+The formula is `omega_R = 0.5 * (wce + sqrt(wce² + 4 * wpe²))`.
 
 **Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
 
@@ -769,6 +759,6 @@ print(f"R cutoff: {omega_Rc / (2*np.pi):.3e} Hz")
 ```
 
 <Note>
-  By construction, ω_R > ω_ce > ω_L > 0 when ω_pe > 0. The whistler mode propagates
-  between ω_L and ω_ce on the R-mode branch.
+  By construction, omega_R is greater than omega_L when wpe is positive. The whistler mode
+  propagates between the L-cutoff and wce on the R-mode branch.
 </Note>

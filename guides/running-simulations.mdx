@@ -1,7 +1,7 @@
 ---
 title: "Running Whistler-Electron Test-Particle Simulations"
 sidebarTitle: "Simulations"
-description: "Step-by-step guide to setting up and integrating gyro-averaged equations of motion for whistler-mode wave-particle interactions using WPIT's Python modules."
+description: "Set up and integrate gyro-averaged equations of motion for whistler-mode wave-particle interactions using WPIT's composable Python modules."
 ---
 
 WPIT provides a complete set of Python routines for modelling the interaction of energetic electrons with whistler-mode waves through test-particle simulations. Rather than a monolithic solver, WPIT is structured as a library of composable functions — you configure the magnetospheric environment, compute the local wave properties, initialise the particle state, and then integrate the gyro-averaged equations of motion using any SciPy integrator. This page walks through the full workflow from environment setup to producing a trajectory.

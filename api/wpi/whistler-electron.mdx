@@ -1,7 +1,7 @@
 ---
 title: "whistler_electron_mod: Oblique Whistler–Electron WPI"
 sidebarTitle: "Whistler–Electron"
-description: "Full API reference for WPIT's oblique whistler–electron module: wpi_params, equations of motion, and nonlinear trapping diagnostics for electron dynamics."
+description: "API reference for WPIT's whistler–electron sub-module: wpi_params, equations of motion, and nonlinear trapping diagnostics for relativistic electrons."
 ---
 
 The `whistler_electron_mod` sub-module implements the relativistic equations of motion for a single electron interacting with an obliquely propagating whistler-mode wave in a dipole magnetic field. It follows the formulation of Bortnik's thesis (equations 2.25a–h) and expresses all coupling through left- and right-hand polarised wave components. The time-derivative functions are designed to be called once per integrator step after `wpi_params` has pre-computed the resonance-order-dependent coupling terms.

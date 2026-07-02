@@ -14,11 +14,7 @@ import WPIT.WaveProperties_mod as wave
 
 ## `resonant_velocity`
 
-Computes the relativistic cyclotron-resonance parallel velocity, perpendicular velocity, total velocity, resonant kinetic energy, and Lorentz factor for a particle interacting with an electromagnetic wave at resonance harmonic number m. The resonance condition is:
-
-> ω − k‖ v‖ − m ω_c / γ = 0
-
-Solving this relativistically for v‖ yields the quadratic formula implemented in the source code.
+Computes the relativistic cyclotron-resonance parallel velocity, perpendicular velocity, total velocity, resonant kinetic energy, and Lorentz factor for a particle interacting with an electromagnetic wave at resonance harmonic number m. The resonance condition is `ω − k‖ v‖ − m ωc / γ = 0`, which is solved relativistically for v‖ via the quadratic formula implemented in the source.
 
 **Reference:** Sousa, A. P. (2018). *Global and Seasonal Effects of Lightning-Induced Electron Precipitation*. Stanford University (PhD thesis).
 
@@ -33,7 +29,7 @@ v_para, v_perp, v_tot, E_res, gamma = wave.resonant_velocity(
 <ParamField path="m_res_arg" type="int" required>
   Resonance harmonic number m. Use `m = 0` for Landau (transit-time) resonance,
   `m = 1` for the fundamental cyclotron resonance, `m = −1` for the anomalous cyclotron
-  resonance, and |m| > 1 for higher harmonics.
+  resonance, and `|m| > 1` for higher harmonics.
 </ParamField>
 
 <ParamField path="w_wave_arg" type="float" required>
@@ -52,7 +48,7 @@ v_para, v_perp, v_tot, E_res, gamma = wave.resonant_velocity(
 
 <ParamField path="alpha_arg" type="float" required>
   Local particle pitch angle α [rad]. The pitch angle defines the ratio
-  v⊥ / v = sin α and is used to project the total resonant velocity onto
+  v_perp / v = sin α and is used to project the total resonant velocity onto
   the field-aligned and perpendicular directions.
 </ParamField>
 
@@ -69,7 +65,7 @@ v_para, v_perp, v_tot, E_res, gamma = wave.resonant_velocity(
 </ResponseField>
 
 <ResponseField name="v_per_res" type="float">
-  Perpendicular resonant velocity v⊥ = v_tot × sin α [m s⁻¹].
+  Perpendicular resonant velocity v_perp = v_tot × sin α [m s⁻¹].
 </ResponseField>
 
 <ResponseField name="v_tot_res" type="float">
@@ -77,13 +73,12 @@ v_para, v_perp, v_tot, E_res, gamma = wave.resonant_velocity(
 </ResponseField>
 
 <ResponseField name="E_res" type="float">
-  Resonant kinetic energy E = (γ − 1) m c² [J] (in CGS ergs as noted in the docstring;
-  the code uses SI: J = kg m² s⁻²).
+  Resonant kinetic energy E = (γ − 1) m c² [J].
 </ResponseField>
 
 <ResponseField name="gamma_res" type="float">
-  Relativistic Lorentz factor γ = 1 / √(1 − v²/c²) (dimensionless). γ = 1 for a
-  non-relativistic particle; γ > 1 for a relativistic particle.
+  Relativistic Lorentz factor γ = 1 / sqrt(1 − v²/c²) (dimensionless). γ = 1 for a
+  non-relativistic particle; γ greater than 1 for a relativistic particle.
 </ResponseField>
 
 ### Example
@@ -123,8 +118,8 @@ print(f"Landau v_para = {v_par0/const.c_light:.4f} c")
 
 <Note>
   For `m_res_arg = 0` (Landau resonance) the function sets direction to `−sign(k‖)` so
-  that the resonant particle moves in the same direction as the wave. For m ≠ 0 the
-  direction is `sign(k‖) × sign(m)`, correctly distinguishing co- and counter-streaming
+  that the resonant particle moves in the same direction as the wave. For m not equal to 0
+  the direction is `sign(k‖) × sign(m)`, correctly distinguishing co- and counter-streaming
   resonances. Ensure `kz_arg` carries the correct sign (positive = northward propagation).
 </Note>
 
@@ -132,7 +127,7 @@ print(f"Landau v_para = {v_par0/const.c_light:.4f} c")
 
 ## `res_angle`
 
-Computes the resonance cone angle θ_res — the wave normal angle at which the refractive index surface of a cold plasma diverges (η² → ∞). At θ_res the wave cannot propagate: energy is deposited at the plasma resonance. For whistler-mode waves, the resonance cone limits the obliqueness of propagation paths.
+Computes the resonance cone angle — the wave normal angle at which the refractive index surface of a cold plasma diverges (η² → ∞). At this angle wave energy is deposited at the plasma resonance. For whistler-mode waves, the resonance cone limits the obliqueness of propagation paths.
 
 **Reference:** Stix, T. H. (1992). *Waves in Plasmas*. Springer Science & Business Media.
 
@@ -155,8 +150,8 @@ theta_res = wave.res_angle(P_arg, S_arg)
 
 <ResponseField name="thetares" type="float">
   Resonance cone half-angle [rad]. Defined by `tan²(θ_res) = −P / S`.
-  Valid only when P/S < 0 (i.e., one of P or S is negative), which is the condition
-  for the existence of a resonance cone in the cold-plasma model.
+  Valid only when P/S is negative (i.e., P and S have opposite signs), which is the
+  condition for the existence of a resonance cone in the cold-plasma model.
 </ResponseField>
 
 ### Example
@@ -173,18 +168,18 @@ print(f"Resonance cone angle = {np.rad2deg(theta_res):.2f} degrees")
 ```
 
 <Note>
-  The expression `tan²(θ_res) = −P/S` requires `−P/S > 0`, i.e., P and S must have
-  opposite signs. At frequencies below the lower hybrid resonance and below ωce, P < 0
-  and S > 0 for whistler-mode waves, so the resonance cone is well-defined. If P/S ≥ 0
-  the function will raise a `ValueError` from `np.sqrt` of a negative number; check the
-  sign of P and S before calling.
+  The expression `tan²(θ_res) = −P/S` requires `−P/S` to be positive, i.e., P and S must
+  have opposite signs. At frequencies below the lower hybrid resonance, P is negative
+  and S is positive for whistler-mode waves, so the resonance cone is well-defined. If
+  P/S is non-negative the function will raise a `ValueError` from `np.sqrt` of a negative
+  number; check the sign of P and S before calling.
 </Note>
 
 ---
 
 ## `gendrin_angle`
 
-Computes the Gendrin angle θ_G — the wave normal angle at which the group velocity vector is directed exactly along the background magnetic field **B₀**. At this angle the wave energy propagates purely field-aligned regardless of the wave normal direction, making it a natural duct for chorus wave generation and propagation. The Gendrin angle exists only in the frequency band ω_lhr < ω < ω_ce/2.
+Computes the Gendrin angle — the wave normal angle at which the group velocity vector is directed exactly along the background magnetic field **B₀**. At this angle the wave energy propagates purely field-aligned regardless of the wave normal direction, making it a natural duct for chorus wave generation and propagation. The Gendrin angle exists only in the frequency band wlhr less than ω less than wce/2.
 
 **Reference:** Bortnik, J., Inan, U. S., and Bell, T. F. (2006). Landau damping and resultant unidirectional propagation of chorus waves. *Geophysical Research Letters* 33.
 
@@ -199,8 +194,8 @@ theta_gendrin = wave.gendrin_angle(w_wave_arg, wlhr_arg, wce_arg)
 </ParamField>
 
 <ParamField path="wlhr_arg" type="float" required>
-  Lower hybrid resonance angular frequency ω_lhr [rad s⁻¹].
-  Approximately `sqrt(ωce × ωcH)` for an electron–proton plasma.
+  Lower hybrid resonance angular frequency [rad s⁻¹].
+  Approximately `sqrt(wce × wcH)` for an electron–proton plasma.
 </ParamField>
 
 <ParamField path="wce_arg" type="float" required>
@@ -210,14 +205,12 @@ theta_gendrin = wave.gendrin_angle(w_wave_arg, wlhr_arg, wce_arg)
 ### Returns
 
 <ResponseField name="th_gen" type="float">
-  Gendrin angle [rad]. The exact formula is:
-
-  `θ_G = arccos(2(ω² − ω_lhr²) / (ω ω_ce))`
-
-  Outside the valid frequency range the function returns:
-  - `np.nan` if ω < ω_lhr (wave below lower hybrid; no Gendrin angle exists)
-  - `π/2` (90°) if ω = ω_lhr (Gendrin angle exactly 90° at the lower hybrid frequency)
-  - `0` if ω_ce/2 < ω < ω_ce (above half the cyclotron frequency; θ_G = 0°)
+  Gendrin angle [rad]. In the valid range (wlhr less than ω less than 0.5 × wce) the
+  formula is `arccos(2 * (ω² − ω_lhr²) / (ω × ωce))`.
+  Outside the valid range the function returns:
+  - `np.nan` if ω is less than wlhr (wave below lower hybrid; no Gendrin angle exists)
+  - `π/2` (90°) if ω equals wlhr
+  - `0` if 0.5 × wce is less than ω less than wce
 </ResponseField>
 
 ### Example

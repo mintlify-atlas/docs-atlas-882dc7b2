@@ -202,9 +202,9 @@ where τ = m ωce − kz p‖/me.
 C1⁻ = (−1)^(m−1) [τ qe p⊥ EwR/(γ³ me² c²) − p⊥ kz w1/(γ² me)]
 ```
 
-### `wpi.nonlinear_C1p(pper, ppar, w2, Exw, Eyw, m_res, wce, kz, gamma)` — Right-Hand Coupling C1⁺
+### `wpi.nonlinear_C1p(pper, ppar, w2, Exw, Eyw, m_res, wce, kz, gamma)` — Left-Polarization Coupling C1⁺
 
-Analogous to C1⁻ but for the right-hand polarization component EwL = (Ex − Ey)/2.
+Analogous to C1⁻ but using the left-hand polarization component EwL = (Ex − Ey)/2 and the wave amplitude parameter w2.
 
 ### `wpi.nonlinear_theta(C0, C1p, C1m, m_res, beta)` — Combined Phase Angle Parameter
 
@@ -257,9 +257,8 @@ S, D, P, R, L_s = wave.stix_parameters(w, ne*1e6, 0, 0, 0, B_eq)
 Bxw, Byw_out, Bzw, Exw, Eyw, Ezw = wave.wave_amplitudes_bell(mu, P, D, S, Byw, theta)
 
 # Convert energy and pitch angle to momenta
-Ek = Ek_keV * 1e3 * env.const.qe   # J
-alpha = env.aeq2alpha(aeq, L, lamda)
-ppar, pper = env.initial_velocity(Ek, alpha, env.const.me)
+alpha = env.aeq2alpha(L, lamda, aeq)
+_, _, ppar, pper, gamma0 = env.initial_velocity(Ek_keV, alpha, env.const.me)
 
 # Initial phase
 eta0 = 0.0

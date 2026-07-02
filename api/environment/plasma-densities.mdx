@@ -235,7 +235,7 @@ $$
 N_e(\lambda) = N_{e,\text{eq}} \cdot \left[\cos\!\left(\frac{\pi}{2} \cdot \frac{\lambda}{\lambda_{\text{inv}}}\right)\right]^{-0.75}
 $$
 
-where $\lambda_{\text{inv}} = \arccos(1/\sqrt{L})$ is the invariant latitude of the field line.
+where $\lambda_{\text{inv}} = \arccos(1/L)$ is the field-line invariant latitude computed in the source.
 
 **Reference:** Ozhogin, P., et al. (2012). "Field-aligned distribution of the plasmaspheric electron density: An empirical model derived from the IMAGE RPI measurements." *J. Geophys. Res.: Space Physics*, 117(A6). doi:10.1029/2011JA017330.
 
@@ -281,5 +281,5 @@ denton_profile = env.density_FL_denton(ne_eq_oz, latitudes)
 ```
 
 <Note>
-  `density_ozhogin` returns **two values**: the equatorial density and the density at the requested latitude. Both are in **cm⁻³**. The first return value is independent of `lambda_arg` — it is purely a function of L-shell. The cosine argument can reach zero at the invariant latitude boundary; avoid evaluating at or beyond `lambda_arg = arccos(1/sqrt(L))`.
+  `density_ozhogin` returns **two values**: the equatorial density and the density at the requested latitude. Both are in **cm⁻³**. The first return value is independent of `lambda_arg` — it is purely a function of L-shell. The cosine argument reaches zero at `lambda_arg = arccos(1/L)`; avoid evaluating at or beyond that latitude.
 </Note>

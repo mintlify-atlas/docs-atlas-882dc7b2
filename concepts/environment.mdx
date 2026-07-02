@@ -96,7 +96,7 @@ print(f"Carpenter-Anderson density: {ne:.2f} cm⁻³")
 
 ### Denton Field-Line Model
 
-`env.density_FL_denton(L, lamda)` — Field-line density model after Denton et al., suitable for tracing density variation along a flux tube.
+`env.density_FL_denton(ne0, lamda)` — Field-line density model after Denton et al. (2002). Takes the equatorial electron density `ne0` and magnetic latitude `lamda` (radians) and returns the local density along the flux tube.
 
 <Tip>
 Use **Sheeley** for quick order-of-magnitude estimates. Use **Carpenter-Anderson** when you need to account for storm-time plasmapause erosion or seasonal effects. Use **Denton** or **Ozhogin** when you need the full latitudinal density profile along the field line rather than just the equatorial value.
@@ -140,7 +140,7 @@ wlhr = env.omega_lhr(wce, wpe, wci, wpi)
 
 ### Upper Hybrid Resonance Frequency
 
-`env.omega_uhr(wpe, wce)` — Upper hybrid resonance frequency.
+`env.omega_uhr(wce, wpe)` — Upper hybrid resonance frequency.
 
 ## Particle Orbital Parameters
 
@@ -153,17 +153,17 @@ alpha_lc = env.loss_cone(5.0)
 print(f"Loss cone at L=5: {np.rad2deg(alpha_lc):.2f}°")
 ```
 
-`env.loss_cone_v2(L)` provides an alternative formulation for comparison.
+`env.loss_cone_v2(L, h)` provides an alternative formulation that also accounts for the mirror altitude `h` (Lauben et al., 2001).
 
 ### Bounce and Drift Periods
 
-`env.T_bounce(L, Ek, alpha_eq, m)` — Relativistic bounce period for a particle of kinetic energy `Ek` and equatorial pitch angle `alpha_eq` at L-shell `L`.
+`env.T_bounce(L, v, aeq)` — Bounce period for a particle with total speed `v` and equatorial pitch angle `aeq` at L-shell `L`.
 
-`env.T_drift(L, Ek, m, q)` — Magnetic drift period around the Earth.
+`env.T_drift(B, m, v, L, aeq)` — Magnetic drift period around the Earth for a particle with background field `B`, mass `m`, speed `v`, L-shell `L`, and equatorial pitch angle `aeq`.
 
 ### Larmor Radius
 
-`env.R_Larmor(pper, m, q, B)` — Larmor (gyro) radius in meters, given the perpendicular momentum `pper`, species mass, charge, and field magnitude.
+`env.R_Larmor(uperp, gamma, B, m, q)` — Larmor (gyro) radius in meters. Inputs are the perpendicular velocity `uperp` (m/s), Lorentz factor `gamma`, magnetic field `B` (T), species mass `m` (kg), and species charge `q` (C).
 
 ### L-shell
 
@@ -171,17 +171,17 @@ print(f"Loss cone at L=5: {np.rad2deg(alpha_lc):.2f}°")
 
 ### Adiabatic Invariant
 
-`env.mu_adiabatic(pper, m, B)` — First adiabatic invariant µ = p⊥²/(2mB).
+`env.mu_adiabatic(pper, B, m)` — First adiabatic invariant µ = p⊥²/(2mB), given perpendicular momentum `pper`, field magnitude `B`, and particle mass `m`.
 
 ## Phase-Space Conversions
 
 Switching between the local pitch angle α (defined with respect to the local field direction) and the equatorial pitch angle αeq (conserved under adiabatic bounce motion) is essential when initializing particles and when recording their trajectories.
 
-### `env.aeq2alpha(aeq, L, lamda)`
+### `env.aeq2alpha(L, lamda, aeq)`
 
-Convert equatorial pitch angle `aeq` (radians) to local pitch angle `alpha` at magnetic latitude `lamda` on L-shell `L`.
+Convert equatorial pitch angle `aeq` (radians) to local pitch angle `alpha`, given L-shell `L` and magnetic latitude `lamda` (radians).
 
-### `env.alpha2aeq(alpha, L, lamda)`
+### `env.alpha2aeq(L, lamda, alpha)`
 
 Convert local pitch angle `alpha` to equatorial pitch angle `aeq`.
 
@@ -193,17 +193,17 @@ aeq   = np.deg2rad(68.0)          # equatorial pitch angle
 L     = 5.0
 lamda = np.deg2rad(20.0)
 
-alpha = env.aeq2alpha(aeq, L, lamda)
+alpha = env.aeq2alpha(L, lamda, aeq)
 print(f"Local pitch angle: {np.rad2deg(alpha):.2f}°")
 
 # Round-trip check
-aeq_back = env.alpha2aeq(alpha, L, lamda)
+aeq_back = env.alpha2aeq(L, lamda, alpha)
 print(f"Recovered aeq: {np.rad2deg(aeq_back):.2f}°")
 ```
 
-### `env.initial_velocity(Ek, alpha, m)`
+### `env.initial_velocity(Ekev, alpha, m)`
 
-Decompose a particle's kinetic energy and local pitch angle into parallel (`ppar`) and perpendicular (`pper`) momentum components, needed as initial conditions for the ODE integrator in `WPI_mod`.
+Decompose a particle's kinetic energy (in keV) and local pitch angle into velocity and momentum components, needed as initial conditions for the ODE integrator in `WPI_mod`. Returns five values: parallel velocity `upar` (m/s), perpendicular velocity `uper` (m/s), parallel momentum `ppar` (kg m/s), perpendicular momentum `pper` (kg m/s), and Lorentz factor `gamma`.
 
 <Accordion title="Debye Length">
 `env.debye_length(ne, Te)` computes the electron Debye length in meters, useful for checking the validity of the cold-plasma approximation (which requires the Debye length to be much smaller than the wavelength of interest).

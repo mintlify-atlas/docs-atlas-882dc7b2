@@ -1,7 +1,7 @@
 ---
 title: "EMIC_ion_mod: Oblique EMIC–Ion Wave Interactions"
 sidebarTitle: "EMIC–Ion"
-description: "Full API reference for WPIT's oblique EMIC–ion module: wpi_params, equations of motion, nonlinear trapping diagnostics, and wave number evolution for ion dynamics."
+description: "API reference for WPIT's EMIC–ion sub-module: wpi_params, equations of motion, nonlinear trapping diagnostics, and ion cyclotron frequency evolution."
 ---
 
 The `EMIC_ion_mod` sub-module implements the relativistic equations of motion for a single ion (proton, helium, or oxygen) interacting with an obliquely propagating Electromagnetic Ion Cyclotron (EMIC) wave in a dipole magnetic field. All coupling is expressed through right-hand and left-hand polarised wave components decomposed via Bessel functions of the first kind. Compared with `whistler_electron_mod`, this module adds two unique evolution equations — `dkpardt` and `dwcdt` — that track the variation of the parallel wave number and the cyclotron frequency along the particle trajectory, which are needed for accurate nonlinear trapping analysis in an inhomogeneous field.
@@ -17,10 +17,13 @@ from WPIT.WPI_mod.EMIC_ion_mod import (
     dEkdt, dgammadt,
     dalphadt, daeqdt,
     detadt,
-    dkpardt, dwcdt,
+    dwcdt,
     nonlinear_C0, nonlinear_C1m, nonlinear_C1p,
     nonlinear_H, nonlinear_S, nonlinear_theta,
 )
+# dkpardt is defined in dkpardt.py but is not re-exported via __init__.py;
+# import it directly if needed:
+from WPIT.WPI_mod.EMIC_ion_mod.dkpardt import dkpardt
 ```
 
 ---
@@ -631,7 +634,8 @@ deta_dt = emic.detadt(ppar_arg, mres_arg, wc_arg, gamma_arg, kpar_arg, mi_arg, w
 Unique to this module. Returns the rate of change of the parallel wave number experienced by the ion as it moves along the magnetic field line. This is needed to compute the nonlinear parameter H accurately in an inhomogeneous field.
 
 ```python
-dkpar_dt = emic.dkpardt(ppar, m, gamma, psi, dkdz)
+from WPIT.WPI_mod.EMIC_ion_mod.dkpardt import dkpardt
+dkpar_dt = dkpardt(ppar, m, gamma, psi, dkdz)
 ```
 
 <ParamField body="ppar" type="float">
@@ -659,7 +663,7 @@ dkpar_dt = emic.dkpardt(ppar, m, gamma, psi, dkdz)
 </ResponseField>
 
 <Note>
-  There is no equivalent of `dkpardt` in `whistler_electron_mod`. The EMIC ion interaction requires explicit tracking of the parallel wave number evolution because the EMIC dispersion surface varies significantly with field-line position and ion composition.
+  `dkpardt` is defined in `EMIC_ion_mod/dkpardt.py` but is not re-exported through `__init__.py`. Import it directly with `from WPIT.WPI_mod.EMIC_ion_mod.dkpardt import dkpardt`. There is no equivalent in `whistler_electron_mod`; the EMIC ion interaction requires explicit tracking of parallel wave-number evolution because the EMIC dispersion surface varies significantly with field-line position and ion composition.
 </Note>
 
 ---
@@ -988,6 +992,7 @@ The following example shows how to assemble one RK4-style step of the EMIC–ion
 ```python
 import numpy as np
 import WPIT.WPI_mod.EMIC_ion_mod as emic
+from WPIT.WPI_mod.EMIC_ion_mod.dkpardt import dkpardt as emic_dkpardt
 from WPIT.Environment_mod import const
 
 # --- Ion species: proton ---
@@ -1044,7 +1049,7 @@ wc = qi * Bmag / (gamma * mi)
 daeq  = emic.daeqdt(pper, ppar, eta, aeq, Ewz, gamma, m_res, qi, mi,
                     pwR, pwL, beta, wR, wL)
 deta  = emic.detadt(ppar, m_res, wc, gamma, kpar, mi, w_wave)
-dkpar = emic.dkpardt(ppar, mi, gamma, eta, dkdz)
+dkpar = emic_dkpardt(ppar, mi, gamma, eta, dkdz)
 dwc   = emic.dwcdt(ppar, mi, gamma, dwcdz)
 
 # Step 3: nonlinear trapping diagnostics

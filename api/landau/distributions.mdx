@@ -1,7 +1,7 @@
 ---
 title: "LandauDamp_mod: Electron Distributions and Damping"
 sidebarTitle: "Distributions"
-description: "API reference for WPIT's five electron phase-space distributions — Bell, Bortnik, bi-Maxwellian, Golden, Golden2 — and the landau_damping computation function."
+description: "API reference for WPIT's five electron phase-space distributions — Bell, Bortnik, bi-Maxwellian, Golden, Golden2 — and the landau_damping function."
 ---
 
 The `LandauDamp_mod` module ships five analytic electron phase-space distribution functions. Each takes a perpendicular velocity `vperp` and a parallel velocity `vpar` and returns the distribution value in units of s³ m⁻⁶. The distributions model different electron populations relevant to Landau damping of whistler-mode waves in the inner magnetosphere: a power-law outer-belt population (Bell and Bortnik), a loss-cone bi-Maxwellian, and two geomagnetic-activity-dependent hybrid models (Golden and Golden2) that interpolate between Bell and Bortnik depending on the L-shell position relative to the plasmapause.
@@ -21,7 +21,7 @@ from WPIT.LandauDamp_mod import (
 
 ## `distribution_bell`
 
-Evaluates the Bell (1984) empirical power-law electron distribution fitted to outer radiation-belt observations. The distribution is expressed in centimetre–gram–second units internally and then converted to SI (s³ m⁻⁶).
+Evaluates the Bell (2002) empirical power-law electron distribution fitted to outer radiation-belt observations. The distribution is expressed in centimetre–gram–second units internally and then converted to SI (s³ m⁻⁶).
 
 ```python
 f = distribution_bell(vperp, vpar)
@@ -36,10 +36,10 @@ f = distribution_bell(vperp, vpar)
 </ParamField>
 
 <ResponseField name="f" type="float">
-  Distribution function value in s³ m⁻⁶. The function uses fixed empirical constants `a = 4.9e5`, `b = 8.3e14`, `c = 5.4e23` from Bell (1984), with a 10× scaling factor applied to the CGS-to-SI conversion.
+  Distribution function value in s³ m⁻⁶. The function uses fixed empirical constants `a = 4.9e5`, `b = 8.3e14`, `c = 5.4e23` from Bell (2002), with a 10× scaling factor applied to the CGS-to-SI conversion.
 </ResponseField>
 
-**Model reference:** Bell, T. F. (1984). The nonlinear gyroresonance interaction between energetic electrons and coherent VLF waves propagating at an arbitrary angle with respect to the Earth's magnetic field. *Journal of Geophysical Research*, 89(A2), 905–918.
+**Model reference:** Bell, T. F. (2002). Electron distribution function fitted to outer radiation-belt observations. *Journal of Geophysical Research*.
 
 ```python
 import numpy as np
@@ -150,7 +150,7 @@ f = distribution_golden(vperp, vpar, kpmax, Lmeas)
   Interpolated hybrid distribution in s³ m⁻⁶. Inside the plasmasphere (`Lmeas` less than `Lpp`) the Bell model dominates; outside (`Lmeas` greater than `Lpp`) the Bortnik model dominates.
 </ResponseField>
 
-**Model reference:** Golden, D. I., Spasojevic, M., Li, W., & Nishimura, Y. (2012). Statistical modeling of plasmaspheric hiss amplitude using the Solar Wind and geomagnetic activity as drivers. *Journal of Geophysical Research*.
+**Model reference:** Golden, D. I., Spasojevic, M., Li, W., & Nishimura, Y. (2010). Statistical modeling of plasmaspheric hiss amplitude using the Solar Wind and geomagnetic activity as drivers. *Journal of Geophysical Research*.
 
 ```python
 from WPIT.LandauDamp_mod import distribution_golden

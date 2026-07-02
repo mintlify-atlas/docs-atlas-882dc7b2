@@ -1,7 +1,7 @@
 ---
 title: "parallel_EMIC_mod: Parallel EMIC–Ion Wave Interactions"
 sidebarTitle: "Parallel EMIC"
-description: "Full API reference for WPIT's parallel EMIC–ion sub-module: simplified equations of motion for ions interacting with field-aligned EMIC waves and nonlinear trapping diagnostics."
+description: "API reference for WPIT's parallel EMIC sub-module: field-aligned ion equations of motion and nonlinear trapping diagnostics, no Bessel functions required."
 ---
 
 The `parallel_EMIC_mod` sub-module implements the relativistic equations of motion for a single ion interacting with a **parallel-propagating** Electromagnetic Ion Cyclotron (EMIC) wave, where the wave normal angle is exactly zero. Because the wave propagates purely along the background magnetic field **B₀**, there is no perpendicular wave vector component, the Bessel function argument beta vanishes identically, and the coupling reduces to a simpler form involving only the wave magnetic field amplitude and a phase velocity term. This makes the module computationally lighter than `EMIC_ion_mod` and appropriate for simulations that assume field-aligned propagation. The nonlinear trapping functions in this module also use a different formulation for `nonlinear_theta` — one that directly involves `Bw` rather than Bessel-weighted electric field components — reflecting the simplified dispersion geometry.

@@ -56,7 +56,6 @@ Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_bell(
 
 <ResponseField name="Bxw_arg" type="float">
   Bx component of the wave magnetic field [T].
-  `Bx = −(D × f₁) / (P × (S − η²)) × By`
 </ResponseField>
 
 <ResponseField name="Byw_arg" type="float">
@@ -65,26 +64,22 @@ Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_bell(
 
 <ResponseField name="Bzw_arg" type="float">
   Bz component of the wave magnetic field [T].
-  `Bz = (D sin θ × f₁) / (P cos θ × (S − η²)) × By`
 </ResponseField>
 
 <ResponseField name="Exw_arg" type="float">
   Ex component of the wave electric field [V m⁻¹].
-  `Ex = (c × f₁) / (η P cos θ) × By`
 </ResponseField>
 
 <ResponseField name="Eyw_arg" type="float">
   Ey component of the wave electric field [V m⁻¹].
-  `Ey = (D c × f₁) / (η P cos θ × (η² − S)) × By`
 </ResponseField>
 
 <ResponseField name="Ezw_arg" type="float">
   Ez component of the wave electric field [V m⁻¹].
-  `Ez = −(c η sin θ / P) × By`
 </ResponseField>
 
 <Note>
-  In all three component formulae, `f₁ = P − η² sin² θ`. The polarisation ratios diverge
+  In all component formulae, `f1 = P − η² sin²θ`. The polarisation ratios diverge
   when `S = η²` (wave at Buchsbaum resonance) or `P = 0` (upper hybrid resonance);
   avoid these limits.
 </Note>
@@ -113,7 +108,7 @@ print(f"Ex = {Ex:.4e} V/m, Ey = {Ey:.4e} V/m, Ez = {Ez:.4e} V/m")
 
 ## `wave_amplitudes_li`
 
-Computes the six wave electromagnetic field components using the normalisation convention of Li et al. (2015), where the amplitude is set by the **total** wave magnetic field magnitude |B_w|. An intermediate normalisation factor I_w is derived from |B_w| and the Stix parameters, ensuring that `√(Bx² + By² + Bz²) = |B_w|` by construction.
+Computes the six wave electromagnetic field components using the normalisation convention of Li et al. (2015), where the amplitude is set by the **total** wave magnetic field magnitude |B_w|. An intermediate normalisation factor I_w is derived from |B_w| and the Stix parameters, ensuring that `sqrt(Bx² + By² + Bz²) = |B_w|` by construction.
 
 **Reference:** Li, J., Bortnik, J., Xie, L., Pu, Z., Chen, L., Ni, B., et al. (2015). Comparison of formulas for resonant interactions between energetic electrons and oblique whistler-mode waves. *Physics of Plasmas* 22, 052902.
 
@@ -153,27 +148,27 @@ Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_li(
 ### Returns
 
 <ResponseField name="Bxw_li" type="float">
-  Bx component [T]. `Bx = −I_w D cos ψ f₁ η`
+  Bx component [T].
 </ResponseField>
 
 <ResponseField name="Byw_li" type="float">
-  By component [T]. `By = I_w P cos ψ (S − η²) η`
+  By component [T].
 </ResponseField>
 
 <ResponseField name="Bzw_li" type="float">
-  Bz component [T]. `Bz = I_w D sin ψ f₁ η`
+  Bz component [T].
 </ResponseField>
 
 <ResponseField name="Exw_li" type="float">
-  Ex component [V m⁻¹]. `Ex = c I_w f₁ (S − η²)`
+  Ex component [V m⁻¹].
 </ResponseField>
 
 <ResponseField name="Eyw_li" type="float">
-  Ey component [V m⁻¹]. `Ey = c I_w D f₁`
+  Ey component [V m⁻¹].
 </ResponseField>
 
 <ResponseField name="Ezw_li" type="float">
-  Ez component [V m⁻¹]. `Ez = −c I_w η² cos ψ sin ψ (S − η²)`
+  Ez component [V m⁻¹].
 </ResponseField>
 
 <Note>
@@ -197,7 +192,6 @@ _, _, eta, *_ = wave.refr_index_full(psi, w, S, P, R, L)
 
 Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_li(eta, P, D, S, Bw_tot, psi)
 
-import numpy as np
 B_mag = np.sqrt(Bx**2 + By**2 + Bz**2)
 print(f"|B| = {B_mag:.4e} T  (should equal {Bw_tot:.4e} T)")
 ```
@@ -272,8 +266,8 @@ Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_jasna(
 <Note>
   The Jasna convention is well suited for global VLF propagation models that output
   Poynting flux rather than field amplitude. The intermediate variable `Byw_sq` is
-  computed from the Poynting flux using the Xstix and polarisation ratio `ρ₂`, then
-  passed to Bell (1984) relations to obtain the remaining components.
+  computed from the Poynting flux using the Xstix factor and polarisation ratio rho2,
+  then passed to Bell (1984) relations to obtain the remaining components.
 </Note>
 
 ### Example
@@ -324,7 +318,7 @@ Bwave = wave.wave_packet_gauss(Bw0_arg, lamda_arg, lamda_range)
 
 <ResponseField name="Bwave" type="float">
   Wave magnetic field amplitude at latitude λ [T].
-  `Bwave = Bw0 × exp(−λ² / λ_range²)`
+  `Bwave = Bw0 * exp(−λ² / λ_range²)`
 </ResponseField>
 
 ### Example
@@ -375,7 +369,7 @@ Bwave = wave.wave_packet_one_sided(Bw0_arg, lamda_arg, shape, location, directio
 </ParamField>
 
 <ParamField path="location" type="float" required>
-  Latitude of the half-maximum (HWHM) point [degrees].
+  Latitude of the half-maximum point [degrees].
   The envelope reaches 50% of its plateau at this latitude.
 </ParamField>
 
@@ -388,8 +382,8 @@ Bwave = wave.wave_packet_one_sided(Bw0_arg, lamda_arg, shape, location, directio
 
 <ResponseField name="Bwave" type="float">
   Wave magnetic field amplitude at latitude λ [T].
-  `Bwave = Bw0 × (tanh(±shape × λ_deg − 2 × location) + 1) / 2`
-  where the sign is +1 for north, −1 for south.
+  Computed as `Bw0 * (tanh(dir * shape * rad2deg(λ) − 2 * location) + 1) / 2`
+  where `dir` is +1 for north and −1 for south.
 </ResponseField>
 
 ### Example
@@ -417,7 +411,7 @@ Bwave_N = np.array([
 
 ## `wave_packet_two_sided`
 
-Returns the wave amplitude modulated by a symmetric two-sided tanh envelope that is peaked at the equator (λ ≈ 0) and rolls off towards both hemispheres. This models a wave packet active near the magnetic equator with a well-defined latitudinal extent.
+Returns the wave amplitude modulated by a symmetric two-sided tanh envelope that is peaked near the equator and rolls off towards both hemispheres. This models a wave packet active near the magnetic equator with a well-defined latitudinal extent.
 
 ```python
 Bwave = wave.wave_packet_two_sided(Bw0_arg, lamda_arg, shape, location)
@@ -439,15 +433,16 @@ Bwave = wave.wave_packet_two_sided(Bw0_arg, lamda_arg, shape, location)
 </ParamField>
 
 <ParamField path="location" type="float" required>
-  Latitude of the half-maximum (HWHM) point [degrees].
+  Latitude of the half-maximum point [degrees].
 </ParamField>
 
 ### Returns
 
 <ResponseField name="Bwave" type="float">
   Wave magnetic field amplitude at latitude λ [T].
-  The envelope is symmetric about the equator: it applies a tanh roll-off with
-  `+shape` for λ > 0 and `−shape` for λ < 0, both anchored at `location` degrees.
+  The envelope is symmetric about the equator: for λ less than 0 the southern
+  tanh roll-off is applied; for λ greater than or equal to 0 the northern roll-off
+  is applied, both anchored at `location` degrees.
 </ResponseField>
 
 ### Example

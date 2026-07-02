@@ -4,7 +4,7 @@ sidebarTitle: "Refractive Index"
 description: "API reference for Appleton-Hartree, full cold-plasma, warm-plasma, and parallel EMIC refractive-index functions in WPIT's WaveProperties_mod module."
 ---
 
-The refractive-index functions in `WaveProperties_mod` convert plasma parameters and wave geometry into the electromagnetic phase and group velocities needed for ray tracing and wave–particle interaction calculations. Four approaches are available: the classic two-fluid Appleton-Hartree formula; the complete cold-plasma Stix formalism via `refr_index_full`; a warm-plasma cubic-root solver in `refr_index_warm`; and a parallel-propagation specialisation for EMIC waves in `refr_index_parallel_EMIC`. All functions return the refractive index η together with the full and component wave numbers κ, κ‖, and κ⊥.
+The refractive-index functions in `WaveProperties_mod` convert plasma parameters and wave geometry into the electromagnetic phase and group velocities needed for ray tracing and wave–particle interaction calculations. Four approaches are available: the classic two-fluid Appleton-Hartree formula; the complete cold-plasma Stix formalism via `refr_index_full`; a warm-plasma cubic-root solver in `refr_index_warm`; and a parallel-propagation specialisation for EMIC waves in `refr_index_parallel_EMIC`. All functions except `refr_index_parallel_EMIC` return the refractive index η together with the full and component wave numbers κ, κ‖, and κ⊥.
 
 ```python
 import WPIT.WaveProperties_mod as wave
@@ -45,18 +45,18 @@ eta_sq_plus, eta_sq_minus, ref_ind, kappa, kappa_par, kappa_per = \
 ### Returns
 
 <ResponseField name="eta_sq_plus" type="float">
-  The **plus** root of the Appleton-Hartree equation, η²₊. At θ = 0 this corresponds
+  The plus root of the Appleton-Hartree equation. At θ = 0 this corresponds
   to the R-mode (right-hand circularly polarised).
 </ResponseField>
 
 <ResponseField name="eta_sq_minus" type="float">
-  The **minus** root, η²₋. At θ = 0 this corresponds to the L-mode (left-hand circularly
+  The minus root. At θ = 0 this corresponds to the L-mode (left-hand circularly
   polarised). At θ = π/2 the two roots map to the O and X modes.
 </ResponseField>
 
 <ResponseField name="ref_ind" type="float">
-  Refractive index η = √η²₊ if η²₊ > 0, else √η²₋ (dimensionless). Selects the first
-  positive-definite root.
+  Refractive index η = sqrt(eta_sq_plus) if eta_sq_plus is positive, else sqrt(eta_sq_minus).
+  Selects the first positive-definite root (dimensionless).
 </ResponseField>
 
 <ResponseField name="kappa" type="float">
@@ -139,17 +139,17 @@ eta_sq_plus, eta_sq_minus, ref_ind, kappa, kappa_par, kappa_per = \
 ### Returns
 
 <ResponseField name="eta_sq_plus" type="float">
-  Larger root η²₊ = (B + F) / (2A) of the Stix biquadratic, where
-  F = √(B² − 4AC) and A, B, C are angle-dependent coefficients built from S, P, R, L.
+  Larger root — (B + F) / (2A) of the Stix biquadratic, where
+  F = sqrt(B² − 4AC) and A, B, C are angle-dependent coefficients built from S, P, R, L.
 </ResponseField>
 
 <ResponseField name="eta_sq_minus" type="float">
-  Smaller root η²₋ = (B − F) / (2A). For whistler-mode waves this is typically the
+  Smaller root — (B − F) / (2A). For whistler-mode waves this is typically the
   physical root (slow mode); the larger root corresponds to the fast/light branch.
 </ResponseField>
 
 <ResponseField name="ref_ind" type="float">
-  Refractive index η = √η²₋ (always uses the minus root). Dimensionless.
+  Refractive index η = sqrt(eta_sq_minus) (always uses the minus root). Dimensionless.
 </ResponseField>
 
 <ResponseField name="kappa" type="float">
@@ -185,14 +185,14 @@ print(f"Full cold-plasma: eta = {eta:.4f},  kappa_par = {kpar:.4e} m^-1")
 
 <Note>
   The minus root is hardcoded in `refr_index_full` to select the whistler/slow branch.
-  If you need the fast branch (η²₊), extract it directly from the `eta_sq_plus` return value.
+  If you need the fast branch, extract it directly from the `eta_sq_plus` return value.
 </Note>
 
 ---
 
 ## `refr_index_warm`
 
-Solves the warm-plasma dispersion relation — a cubic polynomial in η² — for the physical (positive, real) root. Warm corrections introduce finite-temperature effects via the dimensionless thermal ratio τₛ = (k_B Tₛ) / (mₛ c²) × η² for each species. The cubic is assembled from cold tensor components K₁₁⁰, K₂₂⁰, K₃₃⁰, K₁₂⁰ and the warm correction arrays returned by `warm_dielectric_tensor`.
+Solves the warm-plasma dispersion relation — a cubic polynomial in η² — for the physical (positive, real) root. Warm corrections introduce finite-temperature effects via the dimensionless thermal ratio τₛ = (k_B Tₛ) / (mₛ c²) × η² for each species. The cubic is assembled from cold tensor components K110, K220, K330, K120 and the warm correction arrays returned by `warm_dielectric_tensor`.
 
 **Reference:** Kulkarni, P., Gołkowski, M., Inan, U., and Bell, T. (2015). *JGR: Space Physics* 120, 581–591.
 
@@ -234,19 +234,19 @@ ref_ind, kappa, kappa_par, kappa_per = wave.refr_index_warm(
 </ParamField>
 
 <ParamField path="K110" type="complex" required>
-  K₁₁ component of the **cold** dielectric tensor (from `cold_dielectric_tensor`).
+  K11 component of the **cold** dielectric tensor (from `cold_dielectric_tensor`).
 </ParamField>
 
 <ParamField path="K220" type="complex" required>
-  K₂₂ component of the cold dielectric tensor. Equal to K₁₁ for a cold plasma.
+  K22 component of the cold dielectric tensor. Equal to K11 for a cold plasma.
 </ParamField>
 
 <ParamField path="K330" type="complex" required>
-  K₃₃ component of the cold dielectric tensor.
+  K33 component of the cold dielectric tensor.
 </ParamField>
 
 <ParamField path="K120" type="complex" required>
-  K₁₂ component of the cold dielectric tensor (purely imaginary).
+  K12 component of the cold dielectric tensor (purely imaginary).
 </ParamField>
 
 <ParamField path="w_wave_arg" type="float" required>
@@ -307,7 +307,7 @@ print(f"Warm eta = {eta_w:.4f}")
 
 ## `refr_index_parallel_EMIC`
 
-Computes the squared refractive index for **parallel-propagating** electromagnetic ion cyclotron (EMIC) waves in a multi-species cold plasma. The function evaluates the L-mode dispersion relation relevant for EMIC wave propagation studies, where the wave is left-hand polarised at the frequency of the ions.
+Computes the squared refractive index for **parallel-propagating** electromagnetic ion cyclotron (EMIC) waves in a multi-species cold plasma. The function evaluates the L-mode dispersion relation relevant for EMIC wave propagation studies, where the wave is left-hand polarised at the frequency of the ions. Returns η² directly (not η).
 
 **Reference:** Summers, D. and Thorne, R. M. (2003). Relativistic electron pitch-angle scattering by electromagnetic ion cyclotron waves during geomagnetic storms. *JGR: Space Physics* 108.
 
@@ -359,8 +359,8 @@ eta_sq = wave.refr_index_parallel_EMIC(
 
 <ResponseField name="R_tmp" type="float">
   Squared refractive index η² for the parallel L-mode EMIC wave (dimensionless).
-  The function returns η² directly (not η). A positive value indicates propagation;
-  negative values indicate evanescence between the L-cutoff and the ion cyclotron frequency.
+  A positive value indicates propagation; a negative value indicates evanescence
+  between the L-cutoff and an ion cyclotron frequency.
 </ResponseField>
 
 ### Example
@@ -391,7 +391,7 @@ print(f"EMIC parallel eta^2 = {eta_sq:.2f}")
 
 <Note>
   This function returns η² (not η). The EMIC L-mode branch becomes evanescent when
-  the wave frequency approaches `wcH`, `wcHe`, or `wcO` from below — the denominator
-  factors `(ω − ωcH)` etc. change sign, making η² negative. Guard against this with
+  the wave frequency approaches wcH, wcHe, or wcO from below — the denominator
+  factors change sign, making η² negative. Guard against this with
   a frequency range check before calling the function.
 </Note>

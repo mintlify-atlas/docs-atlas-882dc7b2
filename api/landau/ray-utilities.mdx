@@ -1,7 +1,7 @@
 ---
 title: "RayUtils_mod: Ray File I/O, Appending, and Plotting"
 sidebarTitle: "Ray Utilities"
-description: "API reference for WPIT's RayUtils_mod: read and append ray files, compute resonant energies along ray paths, visualise Landau damping, and derive wave-power enhancement histograms."
+description: "API reference for WPIT's RayUtils_mod: read and append ray files, compute resonant energies, visualise Landau damping, and produce wave-power histograms."
 ---
 
 The `RayUtils_mod` sub-module provides six functions that handle the full lifecycle of a ray-tracing dataset in WPIT: parsing the raw ray file into a DataFrame, merging the computed Landau damping results with a rich set of derived plasma and geometric quantities, reading those enriched files back for downstream analysis, and producing several standard diagnostic plots. All functions work with file paths as strings; the appended and raw-input DataFrames are constructed with `pandas` and are fully interoperable with standard scientific Python workflows.
@@ -65,7 +65,7 @@ print(f"Steps: {len(df)}, duration: {df.time.iloc[-1]:.3f} s")
 
 ## `append_ray`
 
-Reads the raw ray file and the corresponding `<ray_file_name>_damping.csv` produced by `landau_damping`, then computes a comprehensive set of derived quantities at each time step and saves the result as `<ray_file_name>_appended.csv`. The raw ray data is truncated to steps where the normalised wave power remains above 1% (0.01).
+Reads the raw ray file and the corresponding `<ray_file_name>_damping.csv` produced by `landau_damping`, then computes a comprehensive set of derived quantities at each time step and saves the result as `<ray_file_name>_appended.csv`. The `damp` column is set to zero for all steps after the first step at which the normalised wave power falls to 0.01 or below.
 
 ```python
 append_ray(ray_file_name)
@@ -76,7 +76,7 @@ append_ray(ray_file_name)
 </ParamField>
 
 <ResponseField name="(side-effect)" type="file">
-  Writes `<ray_file_name>_appended.csv`. The file contains all time steps where `damp > 0.01` and includes the following columns beyond those in the raw ray:
+  Writes `<ray_file_name>_appended.csv`. The file retains all time steps from the raw ray; the `damp` column is zeroed after the first step where wave power drops to 0.01 or below. Columns beyond those in the raw ray include:
 
   | Column | Description |
   |---|---|
