@@ -1,0 +1,94 @@
+---
+title: "LandauDamp_mod: Landau Damping Along Ray Paths"
+sidebarTitle: "Overview"
+description: "Overview of WPIT's LandauDamp_mod: compute, append, and visualise Landau damping of whistler-mode waves along ray-tracing trajectories in the inner magnetosphere."
+---
+
+The `LandauDamp_mod` module computes the **Landau damping** experienced by whistler-mode (or other electromagnetic) waves as they propagate along ray-traced trajectories through the inhomogeneous, anisotropic electron plasma of Earth's inner magnetosphere. Starting from a ray file produced by an external ray-tracing code, the module integrates the imaginary part of the wave vector at each step to produce a normalised wave-power profile as a function of propagation time. It supports five electron distribution functions (Bell, Bortnik, bi-Maxwellian, Golden, and Golden2) and provides a complete pipeline — from reading the raw ray file, computing and saving the damping, appending derived quantities, and generating publication-quality plots — through the companion `RayUtils_mod` sub-module.
+
+## Import patterns
+
+```python
+# Top-level module — distributions and landau_damping
+import WPIT.LandauDamp_mod as ld
+
+# Individual distribution functions
+from WPIT.LandauDamp_mod import (
+    distribution_bell,
+    distribution_bimaxwellian,
+    distribution_bortnik,
+    distribution_golden,
+    distribution_golden2,
+    landau_damping,
+)
+
+# Ray utilities sub-module
+from WPIT.LandauDamp_mod.RayUtils_mod import (
+    read_input_ray,
+    append_ray,
+    read_appended_ray,
+    resonance_along_raypath,
+    enhancement_factor,
+    ray_plots,
+)
+```
+
+## Typical workflow
+
+The intended pipeline for a Landau damping study proceeds in four stages.
+
+**Stage 1 — Read the raw ray file.** `read_input_ray` parses the whitespace-delimited `.ray` file into a pandas DataFrame with standardised column names (positions, refractive indices, magnetic field components, wave frequency, and plasma species data for up to four species).
+
+**Stage 2 — Compute and save the damping.** `landau_damping` iterates over every point along the ray, resolves the wave vector components relative to the local background magnetic field, evaluates the imaginary dispersion integral numerically via `scipy.integrate.quad`, and accumulates the spatial damping rate into a normalised wave-power array. Results are saved alongside the input file as `<ray_file>_damping.csv`.
+
+**Stage 3 — Append derived quantities.** `append_ray` reads both the raw ray file and the damping CSV, computes a rich set of derived quantities (Stix parameters, cyclotron and plasma frequencies for all four species, L-shell, magnetic latitude, wave normal angle relative to **B₀**, resonance cone angle, Gendrin angle, and the truncated damping envelope), and saves everything as `<ray_file>_appended.csv`.
+
+**Stage 4 — Analyse and visualise.** `read_appended_ray`, `resonance_along_raypath`, `enhancement_factor`, and `ray_plots` load the appended file and produce diagnostic outputs ranging from resonant energy profiles versus pitch angle to ray-path plots colour-coded by wave power.
+
+```python
+import WPIT.LandauDamp_mod as ld
+from WPIT.LandauDamp_mod.RayUtils_mod import (
+    append_ray, read_appended_ray,
+    resonance_along_raypath,
+    enhancement_factor, ray_plots,
+)
+
+ray_file = "my_raypath.ray"
+
+# Stage 1+2: compute Landau damping and save _damping.csv
+ld.landau_damping(ray_file, distr='Bell')
+
+# Stage 3: append derived quantities and save _appended.csv
+append_ray(ray_file)
+
+# Stage 4: load appended ray and visualise
+df = read_appended_ray(ray_file + "_appended.csv")
+ray_plots(ray_file + "_appended.csv")
+
+# Resonant energy for a range of pitch angles
+import numpy as np
+alpha_array = np.linspace(10, 80, 15)
+time, psi, Ekev, upar, uper, gamma_res = resonance_along_raypath(
+    ray_file + "_appended.csv", mres=0, alpha_array=alpha_array
+)
+
+# Enhancement factor histogram over L-shell
+enhancement_factor(ray_file + "_appended.csv")
+```
+
+<Note>
+  `landau_damping` writes `<ray_file>_damping.csv` before `append_ray` can be called. The `_damping.csv` file must exist in the same directory as the `.ray` file.
+</Note>
+
+---
+
+## Module contents
+
+<CardGroup cols={2}>
+  <Card title="Distributions" icon="chart-line" href="/api/landau/distributions">
+    Reference for all five electron distribution functions and the `landau_damping` entry point: Bell (1984), Bortnik (2007), bi-Maxwellian, Golden (2010), and Golden2.
+  </Card>
+  <Card title="Ray Utilities" icon="route" href="/api/landau/ray-utilities">
+    Reference for `RayUtils_mod`: reading, appending, and plotting ray files; resonant energy profiles; and wave-power enhancement histograms.
+  </Card>
+</CardGroup>

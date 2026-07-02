@@ -1,0 +1,312 @@
+---
+title: "Plasma Frequency Functions — WPIT Environment_mod"
+sidebarTitle: "Frequencies"
+description: "WPIT Environment_mod frequency API: gyrofrequency, plasma frequency, lower-hybrid and upper-hybrid resonances, and cyclotron frequency field-line gradient."
+---
+
+The frequency functions in `Environment_mod` compute the fundamental characteristic frequencies that govern wave propagation and wave-particle interactions in a magnetised plasma. All functions return angular frequencies in rad/s. These frequencies define the boundaries of wave mode existence (e.g. whistler-mode chorus, hiss, EMIC waves) and appear throughout the wave dispersion relations used in WPIT's wave module. The `dwc_ds` function additionally provides the spatial gradient of the cyclotron frequency along a dipole field line, required for wave-normal angle evolution in ray-tracing calculations.
+
+```python
+import WPIT.Environment_mod as env
+
+# Electron frequencies at L=4, equator
+B   = env.Bmag_dipole(4.0, 0.0)
+ne  = env.density_equ_sheeley(4.0)[0] * 1e6   # cm⁻³ → m⁻³
+
+wce = env.omega_cyclotron(B, env.const.qe, env.const.me)
+wpe = env.omega_plasma(ne, env.const.qe, env.const.me)
+print(f"wce = {wce:.3e} rad/s")
+print(f"wpe = {wpe:.3e} rad/s")
+```
+
+---
+
+## `omega_cyclotron`
+
+Calculates the angular gyrofrequency (cyclotron frequency) of a charged particle in a magnetic field. The cyclotron frequency is the fundamental frequency at which a particle gyrates around a magnetic field line and determines the upper boundary of whistler-mode propagation.
+
+$$
+\Omega_c = \frac{|q| B}{m}
+$$
+
+**Reference:** Parks, G. K. (1991). *Physics of Space Plasmas: An Introduction*. Addison-Wesley.
+
+### Parameters
+
+<ParamField path="B_arg" type="float" required>
+  Magnetic field strength in **Tesla (T)**. Typically obtained from `Bmag_dipole`.
+</ParamField>
+
+<ParamField path="q_arg" type="float" required>
+  Particle charge in **Coulombs (C)**. Use `env.const.qe` for electrons, `env.const.qi` for protons. The absolute value is taken internally so sign does not matter.
+</ParamField>
+
+<ParamField path="m_arg" type="float" required>
+  Particle mass in **kg**. Use `env.const.me` for electrons, `env.const.mH` for protons, `env.const.mHe` for He⁺, `env.const.mO` for O⁺.
+</ParamField>
+
+### Returns
+
+<ResponseField name="omega_tmp" type="float">
+  Particle gyrofrequency in **rad/s**.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.Environment_mod as env
+import numpy as np
+
+L = 4.0
+B = env.Bmag_dipole(L, 0.0)   # equatorial field
+
+# Electron gyrofrequency
+wce = env.omega_cyclotron(B, env.const.qe, env.const.me)
+print(f"Electron cyclotron freq: {wce:.3e} rad/s")
+print(f"  → fce = {wce / (2*np.pi):.0f} Hz")
+
+# Proton gyrofrequency
+wci = env.omega_cyclotron(B, env.const.qi, env.const.mH)
+print(f"Proton cyclotron freq:   {wci:.3e} rad/s")
+print(f"  → fci = {wci / (2*np.pi):.2f} Hz")
+
+# Ratio wce/wci ≈ mp/me ≈ 1836
+print(f"wce/wci = {wce/wci:.0f}")
+```
+
+<Note>
+  This function computes the **non-relativistic** cyclotron frequency. For relativistic particles, divide by the Lorentz factor $\gamma$: `omega_rel = omega_cyclotron(B, q, m) / gamma`.
+</Note>
+
+---
+
+## `omega_plasma`
+
+Calculates the angular plasma frequency for a given particle species. The plasma frequency is the natural oscillation frequency of a plasma and sets the lower cut-off for certain wave modes. The electron plasma frequency in particular controls the refractive index of whistler-mode waves.
+
+$$
+\omega_p = \sqrt{\frac{n q^2}{m \varepsilon_0}}
+$$
+
+**Reference:** Parks, G. K. (1991). *Physics of Space Plasmas: An Introduction*. Addison-Wesley.
+
+### Parameters
+
+<ParamField path="n_arg" type="float" required>
+  Particle number density in **m⁻³** (SI). Note: density models such as `density_equ_sheeley` return values in **cm⁻³**; multiply by $10^6$ before passing to this function.
+</ParamField>
+
+<ParamField path="q_arg" type="float" required>
+  Particle charge in **Coulombs (C)**. Use `env.const.qe` for electrons or `env.const.qi` for ions.
+</ParamField>
+
+<ParamField path="m_arg" type="float" required>
+  Particle mass in **kg**. Use species constants from `env.const` (e.g. `env.const.me`, `env.const.mH`).
+</ParamField>
+
+### Returns
+
+<ResponseField name="omegap_tmp" type="float">
+  Plasma frequency in **rad/s**.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L = 4.0
+
+# Get equatorial density from Sheeley model and convert cm⁻³ → m⁻³
+ne_cm3, _, _ = env.density_equ_sheeley(L)
+ne_m3 = ne_cm3 * 1e6
+
+# Electron plasma frequency
+wpe = env.omega_plasma(ne_m3, env.const.qe, env.const.me)
+print(f"Electron plasma freq: {wpe:.3e} rad/s")
+print(f"  → fpe = {wpe / (2*np.pi) / 1e3:.1f} kHz")
+
+# Proton plasma frequency (assuming all H⁺, same ne)
+wpi = env.omega_plasma(ne_m3, env.const.qi, env.const.mH)
+print(f"Proton plasma freq:   {wpi:.3e} rad/s")
+```
+
+<Note>
+  Density must be in **m⁻³** (SI). Density model outputs in cm⁻³ must be converted by multiplying by $10^6$.
+</Note>
+
+---
+
+## `omega_lhr`
+
+Calculates the lower hybrid resonance (LHR) angular frequency. The lower hybrid resonance frequency marks the lower boundary of the frequency band in which whistler-mode waves can propagate obliquely. It is also important for electron acceleration by lower hybrid waves.
+
+The formula used is:
+
+$$
+\omega_{\text{LHR}} = \left(\frac{1}{\Omega_{ci}\,\Omega_{ce}} + \frac{1}{\omega_{pe}^2 + \omega_{pi}^2}\right)^{-1/2}
+$$
+
+**Reference:** Parks, G. K. (1991). *Physics of Space Plasmas: An Introduction*. Addison-Wesley.
+
+### Parameters
+
+<ParamField path="wce_arg" type="float" required>
+  Electron gyrofrequency in **rad/s**. Obtain from `omega_cyclotron(B, qe, me)`.
+</ParamField>
+
+<ParamField path="wpe_arg" type="float" required>
+  Electron plasma frequency in **rad/s**. Obtain from `omega_plasma(ne, qe, me)`.
+</ParamField>
+
+<ParamField path="wci_arg" type="float" required>
+  Ion gyrofrequency in **rad/s**. Obtain from `omega_cyclotron(B, qi, mi)`. For a hydrogen plasma use `mH`; for a mixed plasma use the dominant ion species.
+</ParamField>
+
+<ParamField path="wpi_arg" type="float" required>
+  Ion plasma frequency in **rad/s**. Obtain from `omega_plasma(ni, qi, mi)`.
+</ParamField>
+
+### Returns
+
+<ResponseField name="wlh_tmp" type="float">
+  Lower hybrid resonance frequency in **rad/s**.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L = 4.0
+B   = env.Bmag_dipole(L, 0.0)
+ne  = env.density_equ_sheeley(L)[0] * 1e6   # m⁻³
+
+# Electron frequencies
+wce = env.omega_cyclotron(B, env.const.qe, env.const.me)
+wpe = env.omega_plasma(ne, env.const.qe, env.const.me)
+
+# Proton frequencies (assuming ni = ne for charge neutrality)
+wci = env.omega_cyclotron(B, env.const.qi, env.const.mH)
+wpi = env.omega_plasma(ne, env.const.qi, env.const.mH)
+
+# Lower hybrid resonance
+wlhr = env.omega_lhr(wce, wpe, wci, wpi)
+print(f"Lower hybrid resonance: {wlhr:.3e} rad/s")
+print(f"  → f_LHR = {wlhr / (2*np.pi):.0f} Hz")
+
+# Approximate check: wlhr ≈ sqrt(wci * wce) when wpe >> wce
+wlhr_approx = np.sqrt(wci * wce)
+print(f"Approximate (sqrt wci*wce): {wlhr_approx:.3e} rad/s")
+```
+
+---
+
+## `omega_uhr`
+
+Calculates the upper hybrid resonance (UHR) angular frequency. The upper hybrid resonance frequency marks the high-frequency electrostatic resonance driven by both the magnetic field and the plasma density, and appears as a distinctive feature in plasma wave spectra.
+
+$$
+\omega_{\text{UHR}} = \sqrt{\omega_{pe}^2 + \Omega_{ce}^2}
+$$
+
+**Reference:** Parks, G. K. (1991). *Physics of Space Plasmas: An Introduction*. Addison-Wesley.
+
+### Parameters
+
+<ParamField path="wce_arg" type="float" required>
+  Electron gyrofrequency in **rad/s**. Obtain from `omega_cyclotron(B, qe, me)`.
+</ParamField>
+
+<ParamField path="wpe_arg" type="float" required>
+  Electron plasma frequency in **rad/s**. Obtain from `omega_plasma(ne, qe, me)`.
+</ParamField>
+
+### Returns
+
+<ResponseField name="wuh_tmp" type="float">
+  Upper hybrid resonance frequency in **rad/s**.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L = 4.0
+B   = env.Bmag_dipole(L, 0.0)
+ne  = env.density_equ_sheeley(L)[0] * 1e6   # m⁻³
+
+wce = env.omega_cyclotron(B, env.const.qe, env.const.me)
+wpe = env.omega_plasma(ne, env.const.qe, env.const.me)
+
+wuhr = env.omega_uhr(wce, wpe)
+print(f"Upper hybrid resonance: {wuhr:.3e} rad/s")
+print(f"  → f_UHR = {wuhr / (2*np.pi) / 1e3:.1f} kHz")
+
+# In low-density plasmas (wpe << wce), wuhr ≈ wce
+# In high-density plasmas (wpe >> wce), wuhr ≈ wpe
+print(f"wpe/wce = {wpe/wce:.2f}")
+```
+
+---
+
+## `dwc_ds`
+
+Calculates the gradient of the cyclotron frequency with respect to arc length along the magnetic field line, $\partial \Omega_c / \partial s$. This gradient is directly proportional to the gradient of B and drives the inhomogeneity term in wave-particle resonance overlap calculations and non-linear trapping widths.
+
+Since $\Omega_c = |q|B/m$, the gradient is:
+
+$$
+\frac{\partial \Omega_c}{\partial s} = \frac{3\,\Omega_c}{L R_E} \cdot \frac{\sin\lambda}{\sqrt{1+3\sin^2\lambda}} \left(\frac{1}{1+3\sin^2\lambda} + \frac{2}{\cos^2\lambda}\right)
+$$
+
+### Parameters
+
+<ParamField path="wc_arg" type="float" required>
+  Cyclotron frequency at the point of interest in **rad/s**. Typically computed as `omega_cyclotron(Bmag_dipole(L, lamda), q, m)`.
+</ParamField>
+
+<ParamField path="lamda_arg" type="float" required>
+  Magnetic latitude in **radians** at the same point where `wc_arg` was evaluated.
+</ParamField>
+
+<ParamField path="L_arg" type="float" required>
+  L-shell value (dimensionless).
+</ParamField>
+
+### Returns
+
+<ResponseField name="dwce_ds_arg" type="float">
+  Gradient of the cyclotron frequency along the field line in **rad/s per metre (rad s⁻¹ m⁻¹)**.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L      = 4.0
+lamda  = np.radians(15.0)   # 15° magnetic latitude
+
+B   = env.Bmag_dipole(L, lamda)
+wce = env.omega_cyclotron(B, env.const.qe, env.const.me)
+
+# Gradient of electron cyclotron frequency
+dwce = env.dwc_ds(wce, lamda, L)
+print(f"dwce/ds = {dwce:.3e} rad/s/m")
+
+# Profile along the field line
+latitudes = np.linspace(1e-6, np.radians(50), 200)   # avoid exact 0
+B_vals  = env.Bmag_dipole(L, latitudes)
+wce_vals = env.omega_cyclotron(B_vals, env.const.qe, env.const.me)
+dwce_profile = env.dwc_ds(wce_vals, latitudes, L)
+```
+
+<Note>
+  The gradient is zero at the magnetic equator ($\lambda = 0$) and increases with latitude. It applies to any species — pass the appropriate gyrofrequency computed for that species. The formula is equivalent to `(q/m) * dB_ds` and the two functions should give consistent results.
+</Note>

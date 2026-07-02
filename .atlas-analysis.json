@@ -1,0 +1,176 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "WPIT",
+  "projectDescription": "A Python-based toolset for modelling wave-particle interactions between energetic charged particles and electromagnetic waves in Earth's magnetosphere via test-particle simulations.",
+  "theme": "palm",
+  "primaryColor": "#2E6DB4",
+  "lightColor": "#5BA3F5",
+  "darkColor": "#1A3F6F",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/overview",
+              "concepts/environment",
+              "concepts/wave-properties",
+              "concepts/wave-particle-interactions",
+              "concepts/landau-damping"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/running-simulations",
+              "guides/ray-tracing",
+              "guides/nonlinear-analysis",
+              "guides/validation"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Environment Module",
+            "pages": [
+              "api/environment/overview",
+              "api/environment/magnetic-field",
+              "api/environment/plasma-densities",
+              "api/environment/frequencies",
+              "api/environment/particle-parameters"
+            ]
+          },
+          {
+            "group": "Wave Properties Module",
+            "pages": [
+              "api/wave-properties/overview",
+              "api/wave-properties/dispersion",
+              "api/wave-properties/refractive-index",
+              "api/wave-properties/wave-amplitudes",
+              "api/wave-properties/resonance"
+            ]
+          },
+          {
+            "group": "WPI Module",
+            "pages": [
+              "api/wpi/overview",
+              "api/wpi/whistler-electron",
+              "api/wpi/emic-ion",
+              "api/wpi/parallel-emic"
+            ]
+          },
+          {
+            "group": "Landau Damping Module",
+            "pages": [
+              "api/landau/overview",
+              "api/landau/distributions",
+              "api/landau/ray-utilities"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Dipole geomagnetic field model and plasma density parameterizations (Sheeley, Carpenter-Anderson, Ozhogin, Denton)",
+    "Cold and warm plasma wave dispersion relations (Appleton-Hartree, Stix formalism)",
+    "Refractive index calculations for whistler-mode, EMIC, O-mode, X-mode, and L/R-mode waves",
+    "Gyro-averaged nonlinear equations of motion for electron-whistler and ion-EMIC interactions",
+    "Landau damping computation along ray paths with multiple particle distribution function models",
+    "Ray path utilities for reading, appending, and plotting ray-tracing output files",
+    "Test-particle simulation capability usable standalone or as an importable Python library",
+    "Jupyter Notebook environment with integrated example notebooks and literature reproductions"
+  ],
+  "publicApiSurface": [
+    "Environment_mod.Bmag_dipole(L_arg, lamda_arg)",
+    "Environment_mod.omega_cyclotron(B_arg, q_arg, m_arg)",
+    "Environment_mod.omega_plasma(N_arg, q_arg, m_arg)",
+    "Environment_mod.omega_lhr(wce_arg, wci_arg, wpe_arg, wpi_arg)",
+    "Environment_mod.omega_uhr(wce_arg, wpe_arg)",
+    "Environment_mod.density_equ_sheeley(L_arg)",
+    "Environment_mod.density_equ_carpenter_anderson(L_arg)",
+    "Environment_mod.density_FL_denton(L_arg, lamda_arg, Neq_arg)",
+    "Environment_mod.density_ozhogin(L_arg, lamda_arg, Neq_arg)",
+    "Environment_mod.loss_cone(L_arg)",
+    "Environment_mod.initial_velocity(Ek_arg, alpha_arg, m_arg)",
+    "Environment_mod.Lshell(r_arg, lamda_arg)",
+    "Environment_mod.T_bounce(L_arg, alpha_eq_arg, v_arg)",
+    "Environment_mod.T_drift(L_arg, Ek_arg, m_arg, q_arg)",
+    "Environment_mod.R_Larmor(m_arg, pper_arg, B_arg, q_arg)",
+    "Environment_mod.mu_adiabatic(pper_arg, B_arg, m_arg)",
+    "Environment_mod.aeq2alpha(aeq_arg, lamda_arg)",
+    "Environment_mod.alpha2aeq(alpha_arg, lamda_arg)",
+    "Environment_mod.dB_ds(L_arg, lamda_arg)",
+    "Environment_mod.dwc_ds(L_arg, lamda_arg, q_arg, m_arg)",
+    "Environment_mod.debye_length(N_arg, T_arg)",
+    "WaveProperties_mod.stix_parameters(w_arg, Ne_arg, NH_arg, NHe_arg, NO_arg, B0mag_arg)",
+    "WaveProperties_mod.stix_parameters_warm(...)",
+    "WaveProperties_mod.cold_dielectric_tensor(...)",
+    "WaveProperties_mod.warm_dielectric_tensor(...)",
+    "WaveProperties_mod.refr_index_appleton(w_arg, wpe_arg, wce_arg, theta_arg)",
+    "WaveProperties_mod.refr_index_full(...)",
+    "WaveProperties_mod.refr_index_warm(...)",
+    "WaveProperties_mod.refr_index_parallel_EMIC(...)",
+    "WaveProperties_mod.dispersion_R(w_arg, wpe_arg, wce_arg)",
+    "WaveProperties_mod.dispersion_L(w_arg, wpe_arg, wci_arg)",
+    "WaveProperties_mod.dispersion_O(w_arg, wpe_arg)",
+    "WaveProperties_mod.dispersion_X(w_arg, wpe_arg, wce_arg, wuhr_arg)",
+    "WaveProperties_mod.dispersion_light(w_arg, wpe_arg)",
+    "WaveProperties_mod.cutoff_L(...)",
+    "WaveProperties_mod.cutoff_R(...)",
+    "WaveProperties_mod.resonant_velocity(m_res_arg, w_wave_arg, kz_arg, wce_arg, alpha_arg)",
+    "WaveProperties_mod.res_angle(...)",
+    "WaveProperties_mod.gendrin_angle(...)",
+    "WaveProperties_mod.wave_amplitudes_bell(...)",
+    "WaveProperties_mod.wave_amplitudes_li(...)",
+    "WaveProperties_mod.wave_amplitudes_jasna(...)",
+    "WaveProperties_mod.wave_packet_gauss(...)",
+    "WaveProperties_mod.wave_packet_one_sided(...)",
+    "WaveProperties_mod.wave_packet_two_sided(...)",
+    "WPI_mod.whistler_electron_mod.wpi_params(...)",
+    "WPI_mod.whistler_electron_mod.dzdt(...)",
+    "WPI_mod.whistler_electron_mod.dlamdadt(...)",
+    "WPI_mod.whistler_electron_mod.dppardt(...)",
+    "WPI_mod.whistler_electron_mod.dpperdt(...)",
+    "WPI_mod.whistler_electron_mod.dEkdt(...)",
+    "WPI_mod.whistler_electron_mod.dgammadt(...)",
+    "WPI_mod.whistler_electron_mod.dalphadt(...)",
+    "WPI_mod.whistler_electron_mod.daeqdt(...)",
+    "WPI_mod.whistler_electron_mod.detadt(...)",
+    "WPI_mod.whistler_electron_mod.nonlinear_C0(...)",
+    "WPI_mod.whistler_electron_mod.nonlinear_C1m(...)",
+    "WPI_mod.whistler_electron_mod.nonlinear_C1p(...)",
+    "WPI_mod.whistler_electron_mod.nonlinear_H(...)",
+    "WPI_mod.whistler_electron_mod.nonlinear_S(...)",
+    "WPI_mod.whistler_electron_mod.nonlinear_theta(...)",
+    "WPI_mod.EMIC_ion_mod.wpi_params(...)",
+    "WPI_mod.EMIC_ion_mod.dkpardt(...)",
+    "WPI_mod.EMIC_ion_mod.dwcdt(...)",
+    "WPI_mod.parallel_EMIC_mod (parallel propagation sub-module)",
+    "LandauDamp_mod.landau_damping(...)",
+    "LandauDamp_mod.distribution_bell(...)",
+    "LandauDamp_mod.distribution_bimaxwellian(...)",
+    "LandauDamp_mod.distribution_bortnik(...)",
+    "LandauDamp_mod.distribution_golden(...)",
+    "LandauDamp_mod.distribution_golden2(...)",
+    "LandauDamp_mod.RayUtils_mod.read_input_ray(ray_file_name)",
+    "LandauDamp_mod.RayUtils_mod.append_ray(ray_file_name)",
+    "LandauDamp_mod.RayUtils_mod.read_appended_ray(ray_file_name)",
+    "LandauDamp_mod.RayUtils_mod.resonance_along_raypath(...)",
+    "LandauDamp_mod.RayUtils_mod.enhancement_factor(...)",
+    "LandauDamp_mod.RayUtils_mod.ray_plots(...)"
+  ]
+}

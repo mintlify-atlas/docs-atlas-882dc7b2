@@ -1,0 +1,351 @@
+---
+title: "Nonlinear Wave-Particle Interaction Analysis in WPIT"
+sidebarTitle: "Nonlinear Analysis"
+description: "Characterise linear vs. nonlinear wave-particle interaction regimes using WPIT's S and H parameters, phase-angle evolution, and C0/C1 coefficient functions."
+---
+
+Determining whether a wave-particle interaction is linear (quasi-linear diffusion) or nonlinear (phase trapping, bunching) is a critical first step before choosing a simulation strategy. WPIT provides dedicated functions — based on the Bortnik (2004) thesis formalism — that compute the nonlinearity parameter S, the inhomogeneity parameter H, the phase-angle evolution, and the auxiliary coefficients C0, C1m, and C1p. These routines exist in both `whistler_electron_mod` (electrons interacting with whistler-mode waves) and `EMIC_ion_mod` (ions interacting with EMIC waves), with slightly different function signatures reflecting the different polarisation geometry.
+
+## Physical background
+
+The threshold between linear and nonlinear regimes is determined by the ratio of the wave-induced inhomogeneity H to the trapping frequency squared ω²_τ:
+
+$$S = \frac{H}{\omega_\tau^2}$$
+
+- **|S| < 1**: The wave amplitude is large enough to produce phase trapping — particles are trapped in the wave's potential well and undergo nonlinear bouncing motion.
+- **|S| ≥ 1**: The ambient field gradients dominate over the wave force. Interactions are quasi-linear and particles pass through the resonance zone without trapping.
+
+The trapping frequency ω_τ sets the natural oscillation frequency of a particle trapped near the resonance and is returned directly by `wpi_params`.
+
+## `wpi_params` — interaction parameters
+
+`wpi_params` is the entry point for computing all parameters required by the equations of motion and the nonlinearity analysis.
+
+### Whistler-electron version
+
+```python
+from WPIT.WPI_mod.whistler_electron_mod import wpi_params
+
+gamma, w1, w2, wtau_sq, R1, R2, beta = wpi_params(
+    m_res_arg,   # resonance order (integer, e.g. 1 for fundamental)
+    ppar_arg,    # parallel momentum (kg·m/s)
+    pper_arg,    # perpendicular momentum (kg·m/s)
+    Bxw_arg,     # Bx wave component (T)
+    Byw_arg,     # By wave component (T)
+    Exw_arg,     # Ex wave component (V/m)
+    Eyw_arg,     # Ey wave component (V/m)
+    Ezw_arg,     # Ez wave component (V/m)
+    kz_arg,      # parallel wave number (rad/m)
+    kx_arg,      # perpendicular wave number (rad/m)
+    wce_arg      # electron gyrofrequency (rad/s)
+)
+```
+
+| Return value | Symbol | Physical meaning |
+|---|---|---|
+| `gamma` | γ | Lorentz factor: γ = √(1 + (p/mₑc)²) |
+| `w1` | ω₁ | RH coupling frequency: ω₁ = (qₑ/2mₑ)(Bxw + Byw) [Bortnik Eq. 2.25e] |
+| `w2` | ω₂ | LH coupling frequency: ω₂ = (qₑ/2mₑ)(Bxw − Byw) [Bortnik Eq. 2.25e] |
+| `wtau_sq` | ω²_τ | Trapping frequency squared [Bortnik Eq. 2.25c] |
+| `R1` | R₁ | RH electric-to-magnetic polarisation ratio: (Exw + Eyw)/(Bxw + Byw) |
+| `R2` | R₂ | LH electric-to-magnetic polarisation ratio: (Exw − Eyw)/(Bxw − Byw) |
+| `beta` | β | Finite-Larmor-radius argument: β = kx p⊥ / (mₑ γ ωce) [Bortnik Eq. 2.25a] |
+
+### EMIC-ion version
+
+The EMIC formulation uses a different polarisation decomposition into right-hand (R) and left-hand (L) circular components:
+
+```python
+from WPIT.WPI_mod.EMIC_ion_mod import wpi_params as wpi_params_emic
+
+beta, BwR, BwL, EwR, EwL, pwR, pwL, wR, wL = wpi_params_emic(
+    pper_arg,    # perpendicular momentum (kg·m/s)
+    kper_arg,    # perpendicular wave number (rad/m)
+    qi_arg,      # ion charge (C)
+    mi_arg,      # ion mass (kg)
+    Bmag_arg,    # |B| (T)
+    Exw_arg,     # Ex (V/m)
+    Eyw_arg,     # Ey (V/m)
+    Bxw_arg,     # Bx (T)
+    Byw_arg      # By (T)
+    gamma_arg,   # Lorentz factor
+)
+```
+
+<Note>
+The EMIC version of `beta` is defined with the opposite sign convention: β = −k⊥ p⊥ / (qᵢ B₀), consistent with the ion resonance formulation.
+</Note>
+
+## Inhomogeneity parameter H
+
+`nonlinear_H` computes the parameter H that quantifies the rate of change of the resonance condition along the particle trajectory:
+
+### Whistler-electron H
+
+```python
+from WPIT.WPI_mod.whistler_electron_mod import nonlinear_H
+
+H = nonlinear_H(
+    pper,       # perpendicular momentum (kg·m/s)
+    ppar,       # parallel momentum (kg·m/s)
+    kpar,       # parallel wave number (rad/m)
+    gamma,      # Lorentz factor
+    m_res,      # resonance order
+    m,          # particle mass (kg)
+    wce,        # gyrofrequency (rad/s)
+    dkpar_dt,   # time derivative of kpar along trajectory (rad/m/s)
+    dwcdz,      # spatial gradient of ωce along field line (rad/s/m)
+    dwdt        # time derivative of wave frequency (rad/s²)
+)
+```
+
+Internally H is decomposed as:
+
+```
+H = (m_res / γ) * (dωce/dt) - (p‖ / γm) * (dkpar/dt)
+  + (kpar p⊥² / 2γ²m²ωce) * (dωce/dz) - dω/dt
+```
+
+### EMIC-ion H
+
+The EMIC version has the same signature but with an additional `dkpar_dt_arg` term and sign differences reflecting the ion resonance condition:
+
+```python
+from WPIT.WPI_mod.EMIC_ion_mod import nonlinear_H
+
+H_ion = nonlinear_H(
+    pper_arg, ppar_arg, kpar_arg, gamma_arg,
+    mres_arg, mi_arg, wce_arg,
+    dkpar_dt_arg, dwcdz_arg, dwdt_arg
+)
+```
+
+## Nonlinearity parameter S
+
+`nonlinear_S` is a direct ratio of H to ω²_τ:
+
+```python
+from WPIT.WPI_mod.whistler_electron_mod import nonlinear_S
+# or: from WPIT.WPI_mod.EMIC_ion_mod import nonlinear_S
+
+S = nonlinear_S(H, wtau_sq)
+# S = H / wtau_sq
+```
+
+The same one-liner applies to the EMIC module — only the inputs change.
+
+## Phase-angle evolution — `nonlinear_theta`
+
+`nonlinear_theta` combines the C0, C1m, and C1p coefficients with Bessel functions to give the full phase-angle driving term (and its magnitude) used in the equations of motion:
+
+```python
+from WPIT.WPI_mod.whistler_electron_mod import nonlinear_theta
+
+theta_dot, theta_dot_mag = nonlinear_theta(C0, Cp1, Cm1, m_res, beta)
+# theta_dot     = C0·Jₘ(β) + Cp1·Jₘ₊₁(β) + Cm1·Jₘ₋₁(β)
+# theta_dot_mag = |theta_dot|
+```
+
+## C coefficients
+
+The three C coefficients capture contributions from the parallel electric field (C0) and the two circular wave polarisation components (C1m, C1p):
+
+<CardGroup cols={2}>
+  <Card title="nonlinear_C0" icon="align-center">
+    Contribution from the parallel electric field Ezw. Dominates at small pitch angles and for Landau (m = 0) resonance.
+  </Card>
+  <Card title="nonlinear_C1m" icon="arrow-left">
+    Contribution from the right-hand circularly polarised (RH) electric component EwR = ½(Exw + Eyw).
+  </Card>
+  <Card title="nonlinear_C1p" icon="arrow-right">
+    Contribution from the left-hand circularly polarised (LH) electric component EwL = ½(Exw − Eyw).
+  </Card>
+  <Card title="nonlinear_theta" icon="rotate">
+    Combines all three C coefficients with Bessel functions Jₘ₋₁, Jₘ, Jₘ₊₁ to give the total phase-angle driving term.
+  </Card>
+</CardGroup>
+
+### Whistler-electron C coefficients
+
+```python
+from WPIT.WPI_mod.whistler_electron_mod import nonlinear_C0, nonlinear_C1m, nonlinear_C1p
+
+C0 = nonlinear_C0(
+    ppar,    # parallel momentum (kg·m/s)
+    m_res,   # resonance order
+    wce,     # gyrofrequency (rad/s)
+    kz,      # parallel wave number (rad/m)
+    gamma,   # Lorentz factor
+    Ezw      # parallel electric field component (V/m)
+)
+
+Cm1 = nonlinear_C1m(
+    pper_arg, ppar_arg, w1_arg,
+    Exw_arg, Eyw_arg,
+    m_res_arg, wce_arg, kz_arg, gamma_arg
+)
+
+Cp1 = nonlinear_C1p(
+    pper_arg, ppar_arg, w2_arg,
+    Exw_arg, Eyw_arg,
+    m_res_arg, wce_arg, kz_arg, gamma_arg
+)
+```
+
+### EMIC-ion C coefficients
+
+The EMIC versions use the circular electric amplitudes `EwL` and `EwR` directly and include the ion charge and mass explicitly:
+
+```python
+from WPIT.WPI_mod.EMIC_ion_mod import nonlinear_C0, nonlinear_C1m, nonlinear_C1p
+
+C0_ion = nonlinear_C0(
+    ppar_arg, kpar_arg, mres_arg, gamma_arg,
+    qi_arg, mi_arg, wce_arg, Ewz_arg
+)
+
+Cm1_ion = nonlinear_C1m(
+    pper_arg, ppar_arg, kpar_arg, mres_arg,
+    qi_arg, mi_arg, gamma_arg,
+    wL_arg, EwL_arg, wce_arg
+)
+
+Cp1_ion = nonlinear_C1p(
+    pper_arg, ppar_arg, kpar_arg, mres_arg,
+    qi_arg, mi_arg, gamma_arg,
+    wR_arg, EwR_arg, wce_arg
+)
+```
+
+## Practical example: diagnosing the regime
+
+The following snippet computes S for a range of wave amplitudes and determines whether each case is in the linear or nonlinear regime.
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+import WPIT.WaveProperties_mod as wave
+from WPIT.WPI_mod.whistler_electron_mod import (
+    wpi_params, nonlinear_H, nonlinear_S
+)
+
+# --- Environment ---
+L      = 5.0
+lamda  = 0.0
+B0     = env.Bmag_dipole(L, lamda)
+wce    = env.omega_cyclotron(B0, env.const.qe, env.const.me)
+ne, *_ = env.density_equ_sheeley(L)
+Ne     = ne * 1e6
+wpe    = env.omega_plasma(Ne, env.const.qe, env.const.me)
+
+# --- Wave ---
+wwave = 2 * np.pi * 2000.0           # 2 kHz
+theta = 0.0                          # parallel propagation
+*_, refr_ind, kappa, kpar, kper = wave.refr_index_appleton(wwave, wpe, wce, theta)
+S_stix, D_stix, P_stix, *_ = wave.stix_parameters(wwave, Ne, 0, 0, 0, B0)
+
+# --- Particle ---
+Ekev  = 100.0
+alpha = np.deg2rad(45.0)
+*_, ppar0, pper0, gamma0 = env.initial_velocity(Ekev, alpha, env.const.me)
+
+m_res  = 1
+# Spatial gradient of ωce (approximated as zero at equator for this example)
+dwcdz  = 0.0
+dkpar_dt = 0.0
+dwdt   = 0.0
+
+# --- Scan over wave amplitudes ---
+Byw_values = np.logspace(-11, -8, 30)   # 0.01 pT to 10 nT
+S_values   = []
+
+for Byw in Byw_values:
+    Bxw, Byw_, Bzw, Exw, Eyw, Ezw = wave.wave_amplitudes_bell(
+        refr_ind, P_stix, D_stix, S_stix, Byw, theta
+    )
+    gamma, w1, w2, wtau_sq, R1, R2, beta = wpi_params(
+        m_res, ppar0, pper0,
+        Bxw, Byw_, Exw, Eyw, Ezw,
+        kpar, kper, wce
+    )
+    H = nonlinear_H(pper0, ppar0, kpar, gamma, m_res, env.const.me,
+                    wce, dkpar_dt, dwcdz, dwdt)
+    S = nonlinear_S(H, wtau_sq)
+    S_values.append(abs(S))
+
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(7, 4))
+plt.semilogx(Byw_values * 1e12, S_values, 'b-', linewidth=2)
+plt.axhline(1.0, color='r', linestyle='--', label='|S| = 1 threshold')
+plt.xlabel("Wave amplitude Byw (pT)")
+plt.ylabel("|S|")
+plt.title("Nonlinearity parameter S vs. wave amplitude")
+plt.legend()
+plt.grid(True, which='both', alpha=0.4)
+plt.tight_layout()
+plt.show()
+
+# Print decision
+for Byw, S in zip(Byw_values[::5], S_values[::5]):
+    regime = "linear (quasi-linear)" if S >= 1.0 else "NONLINEAR (trapped)"
+    print(f"Byw = {Byw*1e12:.3f} pT  |S| = {S:.2f}  →  {regime}")
+```
+
+<Warning>
+At the magnetic equator (`lamda = 0`) the spatial gradient `dwcdz` is zero, which means H is dominated by the `dkpar_dt` term. Off-equatorial resonances produce non-zero `dwcdz` that can substantially raise S, pushing the interaction back toward the linear regime even at large wave amplitudes.
+</Warning>
+
+<Accordion title="Computing S along a ray path">
+Once you have an appended ray file you can evaluate S at every step by looping over the DataFrame and calling `wpi_params`, `nonlinear_H`, and `nonlinear_S` for each row. This gives the spatial profile of the nonlinearity parameter along the actual propagation trajectory of the wave, accounting for the varying field and density.
+
+```python
+import numpy as np
+import pandas as pd
+import WPIT.Environment_mod as env
+import WPIT.WaveProperties_mod as wave
+from WPIT.LandauDamp_mod.RayUtils_mod import read_appended_ray
+from WPIT.WPI_mod.whistler_electron_mod import wpi_params, nonlinear_H, nonlinear_S
+
+appended_file = "Module_descriptions/example_rays/" \
+                "WPIT2_freq2000_psi0.0_L5_lamda_0_mode1.ray_appended.csv"
+df = read_appended_ray(appended_file)
+
+Ekev  = 100.0
+alpha = np.deg2rad(45.0)
+m_res = 1
+Byw_wave = 1e-10   # 100 pT fixed amplitude for this example
+
+S_ray = []
+for i, row in df.iterrows():
+    B0   = np.sqrt(row.Bx**2 + row.By**2 + row.Bz**2)
+    wce  = env.omega_cyclotron(B0, env.const.qe, env.const.me)
+    Ne   = row.Ne
+    wpe  = env.omega_plasma(Ne, env.const.qe, env.const.me)
+    ww   = row.w
+    kpar = ww * row.nz / env.const.c_light
+
+    S_s, D_s, P_s, *_ = wave.stix_parameters(ww, Ne, row.NH, row.NHe, row.NO, B0)
+    theta = np.deg2rad(row.psi)
+    n_sq  = row.nx**2 + row.ny**2 + row.nz**2
+    refr  = np.sqrt(n_sq)
+    kperp = np.sqrt(max(n_sq - (ww * row.nz / env.const.c_light)**2 /
+                        (ww / env.const.c_light)**2, 0)) * ww / env.const.c_light
+
+    Bxw, Byw, Bzw, Exw, Eyw, Ezw = wave.wave_amplitudes_bell(
+        refr, P_s, D_s, S_s, Byw_wave, theta)
+    *_, ppar, pper, gamma = env.initial_velocity(Ekev, alpha, env.const.me)
+    gm, w1, w2, wtau_sq, R1, R2, beta = wpi_params(
+        m_res, ppar, pper, Bxw, Byw, Exw, Eyw, Ezw, kpar, kperp, wce)
+    H  = nonlinear_H(pper, ppar, kpar, gm, m_res, env.const.me, wce, 0, 0, 0)
+    S_ray.append(abs(nonlinear_S(H, wtau_sq)))
+
+import matplotlib.pyplot as plt
+plt.plot(df.lat.values, S_ray)
+plt.axhline(1.0, color='r', linestyle='--', label='|S| = 1')
+plt.xlabel("Magnetic latitude (deg)")
+plt.ylabel("|S|")
+plt.legend()
+plt.show()
+```
+</Accordion>

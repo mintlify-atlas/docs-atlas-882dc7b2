@@ -1,0 +1,107 @@
+---
+title: "WPIT Concepts Overview: Architecture and Data Flow"
+sidebarTitle: "Overview"
+description: "WPIT four-module architecture, data flow from environment through wave properties into particle dynamics, and standalone vs. library usage patterns."
+---
+
+Understanding how WPIT's modules relate to one another makes it much easier to build a simulation or extract individual routines for a custom workflow. This page describes the architecture at a conceptual level — for the detailed function signatures and physics, follow the links to each module's dedicated page.
+
+## The Four Modules
+
+WPIT is structured as a single Python package (`WPIT`) with four top-level sub-packages, each corresponding to a distinct layer of a wave-particle interaction simulation:
+
+```
+WPIT/
+├── Environment_mod         # Magnetospheric background
+├── WaveProperties_mod      # Cold and warm plasma wave theory
+├── WPI_mod/                # Particle equations of motion
+│   ├── whistler_electron_mod
+│   ├── EMIC_ion_mod
+│   └── parallel_EMIC_mod
+└── LandauDamp_mod          # Spatial damping along ray paths
+```
+
+Each module is self-contained — you can import any one of them in isolation — but a complete simulation typically chains them in sequence.
+
+## Data Flow
+
+A standard WPIT simulation follows this pipeline:
+
+```
+L-shell, latitude
+       │
+       ▼
+ Environment_mod
+  ┌─────────────────────────────┐
+  │ Bmag_dipole(L, λ)           │  → B₀ (geomagnetic field)
+  │ density_equ_sheeley(L)      │  → nₑ (electron density)
+  │ omega_cyclotron(B, q, m)    │  → ωce (electron cyclotron freq)
+  │ omega_plasma(n, q, m)       │  → ωpe (electron plasma freq)
+  └─────────────────────────────┘
+       │  B₀, nₑ, ωce, ωpe
+       ▼
+ WaveProperties_mod
+  ┌─────────────────────────────┐
+  │ stix_parameters(...)        │  → S, D, P, R, L
+  │ refr_index_appleton(...)    │  → µ, κ, κ‖, κ⊥
+  │ wave_amplitudes_bell(...)   │  → Bx, By, Bz, Ex, Ey, Ez
+  │ resonant_velocity(...)      │  → v_res
+  └─────────────────────────────┘
+       │  wave fields, κ, ωce
+       ▼
+ WPI_mod (e.g. whistler_electron_mod)
+  ┌─────────────────────────────┐
+  │ dzdt, dlamdadt              │  → trajectory
+  │ dppardt, dpperdt            │  → momentum evolution
+  │ dEkdt, dalphadt, daeqdt     │  → energy & pitch angle
+  │ nonlinear_S, nonlinear_H    │  → nonlinearity regime
+  └─────────────────────────────┘
+```
+
+The **LandauDamp_mod** sits alongside this pipeline rather than below it. It takes a ray file produced by an external ray-tracing code (not included in WPIT) and computes how the wave power decays along that path, using the same environmental quantities as `Environment_mod` and the same wave-theory functions as `WaveProperties_mod`.
+
+## Module Dependencies
+
+| Module | Depends on |
+|---|---|
+| `Environment_mod` | numpy only (plus `const.py` for physical constants) |
+| `WaveProperties_mod` | `Environment_mod` (for `const`) |
+| `WPI_mod` (all sub-modules) | `Environment_mod` (for `const`), `WaveProperties_mod` (for wave fields) |
+| `LandauDamp_mod` | `Environment_mod`, `WaveProperties_mod`, pandas, scipy |
+
+<Note>
+`LandauDamp_mod` also imports from `LandauDamp_mod.RayUtils_mod`, a sub-package that handles reading, appending, and plotting ray-tracing files. `RayUtils_mod` is not imported automatically by the parent `__init__.py` and must be used explicitly.
+</Note>
+
+## Standalone vs. Library Use
+
+**Standalone simulation** — Clone the repository, open one of the `Module_descriptions/` or `WPIT_tests/` Jupyter Notebooks, and run it. All imports are relative to the repository root, and plots are displayed inline.
+
+**Library use** — Add the WPIT root to `sys.path` and import individual functions:
+
+```python
+import sys
+sys.path.insert(0, '/path/to/WPIT')
+
+from WPIT.Environment_mod import Bmag_dipole, omega_cyclotron
+from WPIT.WaveProperties_mod import refr_index_appleton
+```
+
+Because each function is a simple, side-effect-free Python callable, it integrates cleanly into any numerical framework (e.g., SciPy ODE solvers, NumPy vectorized loops, or parallel processing with `multiprocessing`).
+
+## Concept Pages
+
+<CardGroup cols={2}>
+  <Card title="Environment" href="/concepts/environment" icon="globe">
+    Dipole field, density models, characteristic frequencies, and particle orbital parameters.
+  </Card>
+  <Card title="Wave Properties" href="/concepts/wave-properties" icon="wave-sine">
+    Stix parameters, refractive index, dispersion relations, wave amplitudes, and resonance angles.
+  </Card>
+  <Card title="Wave-Particle Interactions" href="/concepts/wave-particle-interactions" icon="bolt">
+    Gyro-averaged equations of motion, nonlinearity parameters, and the three WPI sub-modules.
+  </Card>
+  <Card title="Landau Damping" href="/concepts/landau-damping" icon="chart-line-down">
+    Spatial damping rate, distribution function models, ray-file integration, and enhancement factor.
+  </Card>
+</CardGroup>

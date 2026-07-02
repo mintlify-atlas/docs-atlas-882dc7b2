@@ -1,0 +1,274 @@
+---
+title: "LandauDamp_mod: Electron Distributions and Damping"
+sidebarTitle: "Distributions"
+description: "API reference for WPIT's five electron phase-space distributions — Bell, Bortnik, bi-Maxwellian, Golden, Golden2 — and the landau_damping computation function."
+---
+
+The `LandauDamp_mod` module ships five analytic electron phase-space distribution functions. Each takes a perpendicular velocity `vperp` and a parallel velocity `vpar` and returns the distribution value in units of s³ m⁻⁶. The distributions model different electron populations relevant to Landau damping of whistler-mode waves in the inner magnetosphere: a power-law outer-belt population (Bell and Bortnik), a loss-cone bi-Maxwellian, and two geomagnetic-activity-dependent hybrid models (Golden and Golden2) that interpolate between Bell and Bortnik depending on the L-shell position relative to the plasmapause.
+
+```python
+from WPIT.LandauDamp_mod import (
+    distribution_bell,
+    distribution_bimaxwellian,
+    distribution_bortnik,
+    distribution_golden,
+    distribution_golden2,
+    landau_damping,
+)
+```
+
+---
+
+## `distribution_bell`
+
+Evaluates the Bell (1984) empirical power-law electron distribution fitted to outer radiation-belt observations. The distribution is expressed in centimetre–gram–second units internally and then converted to SI (s³ m⁻⁶).
+
+```python
+f = distribution_bell(vperp, vpar)
+```
+
+<ParamField body="vperp" type="float">
+  Electron velocity component perpendicular to **B₀**, in m s⁻¹.
+</ParamField>
+
+<ParamField body="vpar" type="float">
+  Electron velocity component parallel to **B₀**, in m s⁻¹.
+</ParamField>
+
+<ResponseField name="f" type="float">
+  Distribution function value in s³ m⁻⁶. The function uses fixed empirical constants `a = 4.9e5`, `b = 8.3e14`, `c = 5.4e23` from Bell (1984), with a 10× scaling factor applied to the CGS-to-SI conversion.
+</ResponseField>
+
+**Model reference:** Bell, T. F. (1984). The nonlinear gyroresonance interaction between energetic electrons and coherent VLF waves propagating at an arbitrary angle with respect to the Earth's magnetic field. *Journal of Geophysical Research*, 89(A2), 905–918.
+
+```python
+import numpy as np
+from WPIT.LandauDamp_mod import distribution_bell
+
+vperp = 0.05 * 3e8   # 5% of c perpendicular [m/s]
+vpar  = 0.02 * 3e8   # 2% of c parallel [m/s]
+f_val = distribution_bell(vperp, vpar)
+print(f"f(vperp, vpar) = {f_val:.4e} s^3/m^6")
+```
+
+---
+
+## `distribution_bortnik`
+
+Evaluates the Bortnik et al. (2007) thermal electron power-law distribution. Internally the speed is computed in cm s⁻¹ and the result is converted to SI. The spectral index is determined by `a1 = 0.755` and the amplitude by `a0 = log10(2.14e7)`.
+
+```python
+f = distribution_bortnik(vperp, vpar)
+```
+
+<ParamField body="vperp" type="float">
+  Perpendicular electron velocity, in m s⁻¹.
+</ParamField>
+
+<ParamField body="vpar" type="float">
+  Parallel electron velocity, in m s⁻¹.
+</ParamField>
+
+<ResponseField name="f" type="float">
+  Distribution function value in s³ m⁻⁶. Uses a power-law exponent `nu = 2*a1 + 2 = 3.51` and a mass-scaled amplitude `mdot = 6.25e11 * me`.
+</ResponseField>
+
+**Model reference:** Bortnik, J., Thorne, R. M., & Meredith, N. P. (2007). Modeling the propagation characteristics of chorus using CRRES suprathermal electron fluxes. *Journal of Geophysical Research*, 112(A8).
+
+```python
+from WPIT.LandauDamp_mod import distribution_bortnik
+
+f_val = distribution_bortnik(vperp, vpar)
+print(f"Bortnik f = {f_val:.4e} s^3/m^6")
+```
+
+---
+
+## `distribution_bimaxwellian`
+
+Evaluates a relativistic anisotropic bi-Maxwellian distribution with a loss-cone feature controlled by the parameter `beta`. The hot electron density is hardcoded as `nh = 2e-3 m⁻³`, the parallel thermal speed is 5% of c, and the perpendicular thermal speed is 3% of c. The loss-cone depth is set by `beta = 0.01`.
+
+```python
+f = distribution_bimaxwellian(vperp, vpar)
+```
+
+<ParamField body="vperp" type="float">
+  Perpendicular electron velocity, in m s⁻¹.
+</ParamField>
+
+<ParamField body="vpar" type="float">
+  Parallel electron velocity, in m s⁻¹.
+</ParamField>
+
+<ResponseField name="f" type="float">
+  Distribution function value in s³ m⁻⁶. The function converts (vperp, vpar) to relativistic four-momentum components `(uper, upar) = (gamma*vper, gamma*vpar)` before evaluating the Maxwellian exponents.
+</ResponseField>
+
+**Internal parameters:**
+
+| Symbol | Value | Meaning |
+|---|---|---|
+| `nh` | 2×10⁻³ m⁻³ | Hot electron number density |
+| `Uthpar` | 0.05 c | Parallel thermal speed |
+| `Uthper` | 0.03 c | Perpendicular thermal speed |
+| `beta` | 0.01 | Loss-cone depth parameter |
+
+```python
+from WPIT.LandauDamp_mod import distribution_bimaxwellian
+
+f_val = distribution_bimaxwellian(vperp, vpar)
+print(f"Bi-Maxwellian f = {f_val:.4e} s^3/m^6")
+```
+
+---
+
+## `distribution_golden`
+
+Evaluates the Golden et al. (2010) hybrid distribution, which interpolates in log-space between Bell and Bortnik using a sigmoid function centred on the plasmapause L-shell `Lpp = 5.6 - 0.46 * Kpmax`. The interpolation weight `alpha = 5` controls how sharply the distribution transitions between the two models. This function requires explicit `kpmax` and `Lmeas` arguments.
+
+```python
+f = distribution_golden(vperp, vpar, kpmax, Lmeas)
+```
+
+<ParamField body="vperp" type="float">
+  Perpendicular electron velocity, in m s⁻¹.
+</ParamField>
+
+<ParamField body="vpar" type="float">
+  Parallel electron velocity, in m s⁻¹.
+</ParamField>
+
+<ParamField body="kpmax" type="float">
+  Maximum Kp geomagnetic activity index used to locate the plasmapause. Typical range 0–9.
+</ParamField>
+
+<ParamField body="Lmeas" type="float">
+  L-shell at the measurement point (dimensionless). Controls which side of the plasmapause the ray is on.
+</ParamField>
+
+<ResponseField name="f" type="float">
+  Interpolated hybrid distribution in s³ m⁻⁶. Inside the plasmasphere (`Lmeas` less than `Lpp`) the Bell model dominates; outside (`Lmeas` greater than `Lpp`) the Bortnik model dominates.
+</ResponseField>
+
+**Model reference:** Golden, D. I., Spasojevic, M., Li, W., & Nishimura, Y. (2012). Statistical modeling of plasmaspheric hiss amplitude using the Solar Wind and geomagnetic activity as drivers. *Journal of Geophysical Research*.
+
+```python
+from WPIT.LandauDamp_mod import distribution_golden
+
+kpmax = 4.0    # activity level
+Lmeas = 4.5    # measurement L-shell
+f_val = distribution_golden(vperp, vpar, kpmax, Lmeas)
+print(f"Golden f = {f_val:.4e} s^3/m^6")
+```
+
+---
+
+## `distribution_golden2`
+
+Convenience wrapper around `distribution_golden` with fixed internal parameters `kpmax = 5` and `Lmeas = 2`. Designed for quick use in `landau_damping` when no explicit geomagnetic context is needed.
+
+```python
+f = distribution_golden2(vperp, vpar)
+```
+
+<ParamField body="vperp" type="float">
+  Perpendicular electron velocity, in m s⁻¹.
+</ParamField>
+
+<ParamField body="vpar" type="float">
+  Parallel electron velocity, in m s⁻¹.
+</ParamField>
+
+<ResponseField name="f" type="float">
+  Hybrid distribution value in s³ m⁻⁶, computed at `kpmax = 5`, `Lmeas = 2` (deep inside the plasmapause for strong activity).
+</ResponseField>
+
+<Note>
+  `distribution_golden2` is the version selected by `landau_damping(ray_file, distr='Golden')`. For activity- and L-shell-dependent results, call `distribution_golden` directly.
+</Note>
+
+---
+
+## `landau_damping`
+
+Computes the spatial Landau damping rate at every point along a ray path and accumulates it into a normalised wave-power profile. The function reads the raw ray file, resolves the wave vector and magnetic field projections at each step, selects the distribution function, evaluates the imaginary hot-plasma dispersion integral numerically (summing over resonance orders m = −2 to +2), and writes the resulting power time-series to `<ray_file>_damping.csv`. A preview plot of normalised wave power versus time is shown on screen.
+
+```python
+landau_damping(ray_file, distr)
+```
+
+<ParamField body="ray_file" type="str">
+  Path to the input ray file in the whitespace-delimited format read by `read_input_ray`. The damping CSV is written to the same directory as `ray_file + '_damping.csv'`.
+</ParamField>
+
+<ParamField body="distr" type="str">
+  Electron distribution to use. Accepted values: `'Bell'`, `'Bortnik'`, `'Bimaxw'`, `'Golden'`. Any other string causes a warning and no distribution is set.
+</ParamField>
+
+<ResponseField name="(side-effect)" type="file">
+  Writes `<ray_file>_damping.csv` with two columns: `time` (seconds) and `damp` (normalised wave power, initialised to 1 at t=0 and decaying as the wave propagates).
+</ResponseField>
+
+**Internal steps:**
+
+1. Load ray data via `read_input_ray`.
+2. At each time step, decompose the refractive index vector into components parallel and perpendicular to the local **B** field.
+3. Call `spatialdamping(f, kperp, kpar, w, mres, wch, qh, mh, qs, Ns, ms, nus, B0)` to obtain the imaginary wave number `ki`.
+4. Project `ki` along the group velocity direction (`ki_along_vg`).
+5. Accumulate: `magnitude[i] = magnitude[i-1] * exp(-dist * ki)`, where `dist` is the spatial step length.
+
+<Note>
+  Only the Landau resonance (m=0) and first four cyclotron harmonics (m = ±1, ±2) are included in the damping sum. Higher harmonics are negligible for typical whistler-mode waves. Points where the refractive index magnitude is zero (evanescent regions) are skipped.
+</Note>
+
+```python
+import WPIT.LandauDamp_mod as ld
+
+# Compute damping using Bell distribution
+ld.landau_damping("path/to/ray.ray", distr="Bell")
+# → saves path/to/ray.ray_damping.csv
+# → displays normalised wave power plot
+
+# Switch to Bortnik distribution for outer belt
+ld.landau_damping("path/to/ray.ray", distr="Bortnik")
+```
+
+---
+
+## Comparing distribution functions
+
+The following snippet evaluates all five distributions over a grid and compares their shapes.
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+from WPIT.LandauDamp_mod import (
+    distribution_bell, distribution_bortnik,
+    distribution_bimaxwellian, distribution_golden, distribution_golden2
+)
+
+c = 3e8   # speed of light [m/s]
+vpar  = 0.0
+vperp_arr = np.linspace(0.005 * c, 0.15 * c, 300)
+
+labels = ['Bell', 'Bortnik', 'Bi-Maxwellian', 'Golden (Kp=4,L=4.5)', 'Golden2']
+funcs  = [
+    lambda vp: distribution_bell(vp, vpar),
+    lambda vp: distribution_bortnik(vp, vpar),
+    lambda vp: distribution_bimaxwellian(vp, vpar),
+    lambda vp: distribution_golden(vp, vpar, kpmax=4.0, Lmeas=4.5),
+    lambda vp: distribution_golden2(vp, vpar),
+]
+
+fig, ax = plt.subplots()
+for label, func in zip(labels, funcs):
+    f_arr = np.array([func(vp) for vp in vperp_arr])
+    ax.semilogy(vperp_arr / c, f_arr, label=label)
+
+ax.set_xlabel("v_perp / c")
+ax.set_ylabel("f  [s³ m⁻⁶]")
+ax.legend()
+ax.set_title("Electron distributions at v_par = 0")
+plt.tight_layout()
+plt.show()
+```

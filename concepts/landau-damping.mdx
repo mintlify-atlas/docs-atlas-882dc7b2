@@ -1,0 +1,180 @@
+---
+title: "LandauDamp_mod: Whistler Spatial Damping Along Ray Paths"
+sidebarTitle: "Landau Damping"
+description: "LandauDamp_mod: spatial whistler damping along ray paths with hot-plasma theory and Bell, Bortnik, bi-Maxwellian, and Golden electron distribution models."
+---
+
+Whistler-mode waves generated near the equatorial plane do not propagate indefinitely — thermal electrons with velocities near the parallel Landau resonance absorb wave energy as the wave propagates poleward along a field line. `LandauDamp_mod` computes this **spatial Landau damping rate** step by step along a ray path, integrating the imaginary part of the hot-plasma dielectric tensor over velocity space at each location. The result is the normalized wave power as a function of position along the ray.
+
+```python
+import WPIT.LandauDamp_mod as ld
+```
+
+## Physical Background
+
+In a warm plasma the dielectric tensor acquires an imaginary part that depends on the slope of the velocity distribution function at the resonant velocity. For the Landau (m = 0) resonance, which is the dominant contribution for whistler waves, the resonant velocity is:
+
+```
+v_res = ω / k‖
+```
+
+where ω is the wave frequency and k‖ is the parallel wavenumber. A distribution that decreases with velocity at v_res (∂f/∂v‖ < 0 at v = v_res) leads to net absorption — the wave loses energy to the plasma.
+
+The **spatial damping rate** κᵢ (inverse metres) is derived from the imaginary part of the hot-plasma dispersion relation. The wave amplitude decays as exp(−κᵢ Δs) over a path element Δs. WPIT accumulates these increments along the entire ray:
+
+```
+A(s) = A(0) × exp(−∫₀ˢ κᵢ(s') ds')
+```
+
+## Input: Ray Files
+
+`LandauDamp_mod` is designed to work with ray-tracing output produced by an **external ray-tracing code** (not included in WPIT). The ray file is a whitespace-delimited ASCII file with one time step per row and the following columns:
+
+| Column group | Contents |
+|---|---|
+| `ray`, `ray_stop`, `time` | Ray identifier, stop flag, time (s) |
+| `posx`, `posy`, `posz` | Position (m), Solar-Magnetic Cartesian coordinates |
+| `vprelx/y/z` | Phase velocity (relative to c) |
+| `vgrelx/y/z` | Group velocity (relative to c) |
+| `nx`, `ny`, `nz` | Refractive index vector components |
+| `Bx`, `By`, `Bz` | Background magnetic field (T) |
+| `w` | Wave angular frequency (rad/s) |
+| `qs1–qs4` | Species charges (C) |
+| `ms1–ms4` | Species masses (kg) |
+| `Ns1–Ns4` | Species number densities (m⁻³) |
+| `nus1–nus4` | Collision frequencies |
+
+An example ray file is provided in `Module_descriptions/example_rays/`.
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import read_input_ray
+
+df = read_input_ray('Module_descriptions/example_rays/WPIT_freq2000_psi0.0_L5_lamda_0_mode1.ray')
+print(df.columns.tolist())
+```
+
+## The `landau_damping` Function
+
+`ld.landau_damping(ray_file, distr)` is the main entry point. It reads the ray file, loops over all time steps, computes the spatial damping rate at each step using the specified electron distribution, integrates the attenuation, and saves the result to a CSV file alongside the ray file. It also produces a plot of normalized wave power vs. time.
+
+```python
+import WPIT.LandauDamp_mod as ld
+
+ld.landau_damping(
+    ray_file='Module_descriptions/example_rays/WPIT_freq2000_psi0.0_L5_lamda_0_mode1.ray',
+    distr='Bell'    # 'Bell', 'Bortnik', 'Bimaxw', or 'Golden'
+)
+```
+
+The output CSV (`<ray_file>_damping.csv`) contains two columns: `time` and `damp` (normalized wave power, starting at 1.0).
+
+<Note>
+The resonance orders included in the damping calculation are m = −2, −1, 0, +1, +2. The m = 0 (Landau) term dominates for obliquely propagating whistler waves. The m ≠ 0 terms capture cyclotron resonance contributions, which can be significant for field-aligned propagation.
+</Note>
+
+## Electron Distribution Function Models
+
+The damping rate depends critically on the slope of the electron distribution at the Landau resonant velocity. WPIT implements five models, reflecting different plasma environments:
+
+### Bi-Maxwellian — `ld.distribution_bimaxwellian(vperp, vpar)`
+
+An anisotropic Maxwellian with a loss-cone modification, suitable for the outer radiation belt. Key parameters (hard-coded in the current implementation):
+
+- Hot electron density: nₕ = 2 × 10⁻³ m⁻³
+- Parallel thermal speed: U‖ = 0.05 c
+- Perpendicular thermal speed: U⊥ = 0.03 c
+- Loss-cone parameter: β = 0.01
+
+```
+f(v⊥, v‖) = nₕ / (2π^(3/2) U‖ U⊥²) × exp(−u‖²/2U‖²) × 1/(1−β) × [exp(−u⊥²/2U⊥²) − exp(−u⊥²/2βU⊥²)]
+```
+
+where (u‖, u⊥) = γ (v‖, v⊥) are the relativistic four-velocities.
+
+### Bell (2002) — `ld.distribution_bell(vperp, vpar)`
+
+Power-law distribution from Bell (2002), parameterized as a function of total speed v (in cm/s):
+
+```
+f(v) = a/v⁴ − b/v⁵ + c/v⁶
+```
+
+with a = 4.9 × 10⁵, b = 8.3 × 10¹⁴, c = 5.4 × 10²³. The output is scaled to SI units (s³/m⁶).
+
+```python
+f_val = ld.distribution_bell(vperp=1e6, vpar=5e5)
+```
+
+### Bortnik et al. (2007) — `ld.distribution_bortnik(vperp, vpar)`
+
+Thermal electron distribution following Bortnik et al. (2007a), parameterized as:
+
+```
+f(v) = Aₙ / v^ν
+```
+
+where ν = 2a₁ + 2, a₁ = 0.755, and the normalization Aₙ is derived from the amplitude parameter a₀ = log₁₀(2.14 × 10⁷).
+
+### Golden et al. (2010) — `ld.distribution_golden(vperp, vpar, kpmax, Lmeas)`
+
+A hybrid distribution that blends the Bell and Bortnik models using a sigmoid weighting function that depends on the distance of the observation point from the plasmapause:
+
+```
+f = exp[w_Bell × ln(f_Bell) + w_Bortnik × ln(f_Bortnik)] / (w_Bell + w_Bortnik)
+```
+
+The plasmapause location L_pp = 5.6 − 0.46 Kp_max is used to compute the blending weights, making this distribution activity-dependent.
+
+### Golden2 — `ld.distribution_golden2(vperp, vpar)`
+
+A pre-configured version of the Golden distribution with fixed parameters (Kp_max = 5, L_meas = 2), useful for a quick comparison without having to supply storm-time indices.
+
+<Tip>
+For a first estimate, use `'Bimaxw'` (bi-Maxwellian) to check qualitative behaviour. For quantitative comparisons with observations in the outer radiation belt, `'Golden'` or `'Bell'` are more physically motivated. The Bortnik distribution gives the softest spectrum and produces the most gradual damping.
+</Tip>
+
+## Ray Utilities (`RayUtils_mod`)
+
+`LandauDamp_mod` includes a sub-package `RayUtils_mod` with helper functions for managing ray files:
+
+| Function | Description |
+|---|---|
+| `read_input_ray(ray_file)` | Read a raw ray file into a pandas DataFrame |
+| `append_ray(ray_file)` | Enrich the ray with derived quantities (psi, Stix parameters, L-shell, lat/lon via SpacePy) and merge with damping output; saves `<ray_file>_appended.csv` |
+| `read_appended_ray(ray_file)` | Read a previously appended CSV back into a DataFrame |
+| `resonance_along_raypath(ray_file)` | Compute and plot resonant velocities and energies along the ray |
+| `ray_plots(ray_file)` | Diagnostic plots of wave normal angle, Stix parameters, and frequencies along the ray |
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import append_ray, read_appended_ray
+
+# Step 1: run damping
+ld.landau_damping(ray_file, 'Bell')
+
+# Step 2: append derived quantities (requires SpacePy for coordinate conversion)
+append_ray(ray_file)
+
+# Step 3: read the enriched file
+df = read_appended_ray(ray_file + '_appended.csv')
+print(df[['time', 'lat', 'L', 'wce', 'psi', 'damp']].head())
+```
+
+<Warning>
+`append_ray` uses **SpacePy's coordinate transformation** (`spacepy.coordinates`) to convert Solar-Magnetic Cartesian positions to magnetic latitude and L-shell. Ensure SpacePy is correctly installed and that the IGRF/OMNI data files have been downloaded before calling this function.
+</Warning>
+
+## Enhancement Factor
+
+`RayUtils_mod.enhancement_factor(ray_file_appended)` estimates the wave cavity enhancement as a function of L-shell by tracking the wave power each time the ray crosses the geomagnetic equator:
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import enhancement_factor
+
+enhancement_factor('path/to/ray_file_appended.csv')
+```
+
+The function interpolates the ray trajectory onto a fine time grid, identifies equatorial crossings (sign changes of magnetic latitude), samples the normalized wave power at each crossing, and plots a histogram of power vs. L-shell weighted by the damping factor. This gives an estimate of how much wave energy survives multiple bounces — i.e., the effective cavity amplification that can build up chorus wave intensities in the inner magnetosphere.
+
+<Accordion title="Multi-ray and batch processing">
+To process many ray files (e.g., a frequency sweep or a range of wave normal angles), loop over the file list and call `landau_damping` for each one. The output CSV naming convention (`<ray_file>_damping.csv`) ensures that results are saved alongside the inputs without overwriting each other. The `Module_descriptions/LandauDamp_mod_description.ipynb` notebook shows a complete batch workflow comparing multiple distribution functions on the same ray.
+</Accordion>

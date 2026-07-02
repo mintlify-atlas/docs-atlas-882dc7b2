@@ -1,20 +1,94 @@
 ---
-title: "Introduction"
-description: "Welcome to your project"
+title: "WPIT: Wave-Particle Interactions Toolset"
+sidebarTitle: "Home"
+description: "WPIT is an open-source Python toolset for modelling wave-particle interactions between energetic charged particles and electromagnetic waves in Earth's magnetosphere."
 ---
 
-Write a short description of your product here. What it does, who it's for, and what they can accomplish with it.
+WPIT (Wave-Particle Interactions Toolset) is a Python-based library and simulation environment for studying how energetic charged particles in the radiation belts interact with plasma waves such as whistler-mode chorus and electromagnetic ion cyclotron (EMIC) waves. It provides four modular components covering magnetospheric environment modelling, cold and warm plasma wave properties, gyro-averaged equations of motion for test-particle simulations, and Landau damping calculations — all usable interactively via Jupyter Notebooks or importable as a Python library.
 
-<Tip>
-  Ready to make this your own? Start by editing this page. Update your `docs.json` file to customize your site. Then fill out the [Quickstart](/quickstart) page.
-</Tip>
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run your first wave-particle interaction simulation in minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Set up WPIT and its dependencies
+  </Card>
+  <Card title="Concepts" icon="book-open" href="/concepts/overview">
+    Understand the physics and architecture behind WPIT
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/environment/overview">
+    Explore every module, function signature, and parameter
+  </Card>
+</CardGroup>
 
-<Card title="Quickstart" icon="rocket" href="/quickstart">
-  This card links to the quickstart page in your project.
-</Card>
-<Card title="Components" icon="puzzle-piece" href="https://mintlify.com/docs/components">
-  Add cards, callouts, steps, tabs, and more to design and structure your pages.
-</Card>
-<Card title="Settings" icon="gear" href="https://mintlify.com/docs/organize/settings">
-  Set your site name, branding, and navigation in the `docs.json` file.
-</Card>
+## What WPIT Does
+
+WPIT provides a unified set of routines that cover the full chain of a wave-particle interaction simulation:
+
+<CardGroup cols={2}>
+  <Card title="Environment Model" icon="globe" href="/concepts/environment">
+    Geomagnetic dipole field, plasma densities, characteristic frequencies, loss cone, and particle orbital parameters
+  </Card>
+  <Card title="Wave Properties" icon="wave-sine" href="/concepts/wave-properties">
+    Refractive index, dispersion relations, Stix parameters, resonance angles, and wave amplitude models
+  </Card>
+  <Card title="WPI Equations of Motion" icon="atom" href="/concepts/wave-particle-interactions">
+    Gyro-averaged equations of motion for whistler–electron, EMIC–ion, and parallel EMIC interactions, including nonlinearity metrics
+  </Card>
+  <Card title="Landau Damping" icon="chart-line" href="/concepts/landau-damping">
+    Spatial damping rate along a ray path for multiple particle distribution functions
+  </Card>
+</CardGroup>
+
+## Getting Started
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/stourgai/WPIT.git
+    cd WPIT
+    ```
+  </Step>
+  <Step title="Install dependencies">
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+  <Step title="Import WPIT in Python or Jupyter">
+    ```python
+    import WPIT.Environment_mod as env
+    import WPIT.WaveProperties_mod as wave
+    import WPIT.WPI_mod.whistler_electron_mod as wpi
+    import WPIT.LandauDamp_mod as ld
+    ```
+  </Step>
+  <Step title="Run your first calculation">
+    ```python
+    import numpy as np
+    import WPIT.Environment_mod as env
+
+    # Dipole field strength at L=5, equator
+    L = 5.0
+    lamda = 0.0  # magnetic latitude in radians
+    B = env.Bmag_dipole(L, lamda)
+    print(f"B at L={L}, equator: {B:.3e} T")
+
+    # Electron cyclotron frequency
+    wce = env.omega_cyclotron(B, env.const.qe, env.const.me)
+    print(f"Electron cyclotron frequency: {wce/(2*np.pi):.1f} Hz")
+    ```
+  </Step>
+</Steps>
+
+## Modules at a Glance
+
+| Module | Purpose |
+|---|---|
+| `Environment_mod` | Dipole field, densities, frequencies, particle kinematics |
+| `WaveProperties_mod` | Dispersion, refractive index, wave amplitudes, resonance |
+| `WPI_mod` | Equations of motion for whistler, EMIC, and parallel EMIC interactions |
+| `LandauDamp_mod` | Landau damping rates, distribution functions, ray path utilities |
+
+<Note>
+WPIT is distributed under the Creative Commons Attribution (CC BY) license. When using WPIT in research, please cite: Tourgaidis, S., & Sarris, T. *Wave-Particle Interactions Toolset (WPIT): a Python-based toolset to model wave-particle interactions in the magnetosphere.* Frontiers in Astronomy and Space Sciences, 295.
+</Note>

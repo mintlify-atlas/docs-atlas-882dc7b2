@@ -1,0 +1,198 @@
+---
+title: "WPIT Validation Against Published Literature"
+sidebarTitle: "Validation"
+description: "How WPIT's test-particle simulation results are validated by reproducing key figures from Bortnik 2008, Albert & Bortnik 2009, Su et al. 2012, and Su et al. 2014."
+---
+
+Confidence in any simulation framework depends on reproducibility of established results. WPIT includes a dedicated `WPIT_tests/` directory of Jupyter notebooks that reproduce specific figures from four peer-reviewed papers spanning the main WPI regimes: large-amplitude chorus interactions, nonlinear electron scattering, and EMIC-wave ion interactions. Each notebook serves both as a regression test and as a self-contained tutorial demonstrating realistic parameter choices. This page documents the validated results, explains how to run the notebooks, and details the tested software environment.
+
+## Testing environment
+
+WPIT has been validated on the following software stack. Using different versions — particularly of SciPy and NumPy — may yield minor numerical differences that do not represent code errors.
+
+| Package | Tested version |
+|---|---|
+| Python | 3.6.9 |
+| matplotlib | 3.2.0 |
+| numpy | 1.19.5 |
+| scipy | 1.5.4 |
+| pandas | 1.1.5 |
+| spacepy | 0.2.2 |
+| notebook | 6.4.1 |
+| OS | Ubuntu 18.04 LTS |
+
+<Tip>
+Install all dependencies at once using the provided requirements file:
+
+```bash
+pip install -r requirements.txt
+```
+
+Then start the Jupyter server from the repository root:
+
+```bash
+jupyter notebook
+```
+
+Navigate to `WPIT_tests/` and open the notebook of interest.
+</Tip>
+
+## Validated paper comparisons
+
+<Accordion title="Bortnik et al. 2008 — Nonlinear interaction of energetic electrons with large-amplitude chorus">
+
+**Reference:** Bortnik, J., Thorne, R. M., & Inan, U. S. (2008). Nonlinear interaction of energetic electrons with large amplitude chorus. *Geophysical Research Letters*, 35, L21102.
+
+**Notebook:** `WPIT_tests/Nonlinear interaction of energetic electrons with large amplitude chorus.ipynb`
+
+This notebook validates WPIT's whistler-electron test-particle simulation against three panels from Figure 2 of Bortnik et al. 2008, which study the nonlinear phase trapping and acceleration of radiation belt electrons by large-amplitude chorus waves.
+
+**Reproduced figures:**
+
+| WPIT figure | Original | Description |
+|---|---|---|
+| `Figure_2i_of_Bortnik_et_al_2008.png` | Fig. 2i | Phase angle η vs. time for a trapped particle |
+| `Figure_2j_of_Bortnik_et_al_2008.png` | Fig. 2j | Pitch angle α vs. time showing nonlinear oscillation |
+| `Figure_2k_of_Bortnik_et_al_2008.png` | Fig. 2k | Kinetic energy Ek vs. time during trapping event |
+
+**Key parameters used:**
+- L = 4, equatorial pitch angle α_eq = 40°, energy = 100 keV
+- Wave frequency = 0.35 ωce, wave amplitude Byw = 300 pT
+- Fundamental cyclotron resonance (m_res = 1)
+
+The notebook demonstrates that WPIT reproduces the characteristic sawtooth phase-angle pattern and the associated energy modulation that defines a nonlinearly trapped particle (|S| < 1).
+
+</Accordion>
+
+<Accordion title="Albert and Bortnik 2009 — Nonlinear interaction of radiation belt electrons with chorus waves">
+
+**Reference:** Albert, J. M., & Bortnik, J. (2009). Nonlinear interaction of radiation belt electrons with electromagnetic ion cyclotron waves. *Geophysical Research Letters*, 36, L12110.
+
+**Notebook:** `WPIT_tests/Nonlinear interaction of radiation belt electrons with electromagnetic ion cyclotron waves.ipynb`
+
+This notebook reproduces Figure 4 panels a, b, and c from Albert and Bortnik 2009, which compare test-particle trajectory results between linear and nonlinear regimes.
+
+**Reproduced figures:**
+
+| WPIT figure | Original | Description |
+|---|---|---|
+| `Figure_4a_of_Albert_and_Bortnik_2009.png` | Fig. 4a | Equatorial pitch angle α_eq vs. time |
+| `Figure_4b_of_Albert_and_Bortnik_2009.png` | Fig. 4b | Kinetic energy vs. time |
+| `Figure_4c_of_Albert_and_Bortnik_2009.png` | Fig. 4c | Phase space trajectory (p⊥ vs. p‖) |
+
+The reproduction confirms that WPIT's `daeqdt`, `dEkdt`, and the full set of momentum equations produce trajectories consistent with the published nonlinear test-particle code.
+
+</Accordion>
+
+<Accordion title="Su et al. 2012 — Latitudinal dependence of nonlinear EMIC-ion interaction">
+
+**Reference:** Su, Z., Zheng, H., & Wang, S. (2012). Latitudinal dependence of nonlinear interaction between electromagnetic ion cyclotron wave and terrestrial ring current ions. *Journal of Geophysical Research: Space Physics*, 117, A06205.
+
+**Notebook:** `WPIT_tests/Latitudinal dependence of nonlinear interaction between electromagnetic ion cyclotron wave and terrestrial ring current ions.ipynb`
+
+This notebook validates WPIT's `EMIC_ion_mod` by reproducing Figure 12 of Su et al. 2012, which examines how EMIC-wave ion interactions depend on the magnetic latitude of the particle when it enters the resonance zone.
+
+**Reproduced figures:**
+
+| WPIT figure | Original | Description |
+|---|---|---|
+| `Figure_12a_of_Su_et_al_2012.png` | Fig. 12a | Pitch angle vs. time for H⁺ at different latitudes |
+| `Figure_12b_of_Su_et_al_2012.png` | Fig. 12b | Kinetic energy vs. time for the same cases |
+
+The comparison validates the EMIC equations of motion (`dzdt`, `dppardt`, `dpperdt`, `detadt`) and the `nonlinear_S` function for the ion resonance case, confirming that phase trapping at off-equatorial latitudes is correctly captured.
+
+</Accordion>
+
+<Accordion title="Su et al. 2014 — Bounce-averaged advection and diffusion with EMIC waves">
+
+**Reference:** Su, Z., Xiao, F., Zheng, H., & Wang, S. (2014). Bounce-averaged advection and diffusion coefficients for monochromatic electromagnetic ion cyclotron wave: Comparison between test-particle and quasi-linear models. *Journal of Geophysical Research: Space Physics*, 119, 8721–8734.
+
+**Notebook:** `WPIT_tests/Bounce-averaged advection and diffusion coefficients for monochromatic electromagnetic ion cyclotron wave Comparison between test-particle and quasi-linear models.ipynb`
+
+This notebook reproduces seven panels from Su et al. 2014, providing the most comprehensive validation of WPIT's EMIC-ion module, including both single-particle trajectories and bounce-averaged drift/diffusion coefficients.
+
+**Reproduced figures:**
+
+| WPIT figure | Original | Description |
+|---|---|---|
+| `Figure_3f_of_Su_et_al_2014.png` | Fig. 3f | Pitch angle α_eq vs. time |
+| `Figure_3g_of_Su_et_al_2014.png` | Fig. 3g | Kinetic energy vs. time |
+| `Figure_3i_of_Su_et_al_2014.png` | Fig. 3i | Phase angle η vs. time |
+| `Figure_3j_of_Su_et_al_2014.png` | Fig. 3j | Nonlinearity parameter S vs. time |
+| `Figure_4c_of_Su_et_al_2014.png` | Fig. 4c | Bounce-averaged pitch-angle diffusion coefficient |
+| `Figure_4d_of_Su_et_al_2014.png` | Fig. 4d | Bounce-averaged energy diffusion coefficient |
+
+<Note>
+Figure 3k and additional panels labelled in the `WPIT_tests/` output images (`Figure_3k_of_Su_et_al_2014`) are auxiliary diagnostics generated by the same notebook. Run the full notebook to produce all output figures.
+</Note>
+
+The reproduction of bounce-averaged diffusion coefficients (Figs. 4c and 4d) is particularly significant: it shows that WPIT's test-particle averages converge to the quasi-linear prediction in the weakly nonlinear limit, providing a stringent cross-check of the entire simulation pipeline.
+
+</Accordion>
+
+## Running the validation notebooks
+
+<Steps>
+
+### Clone the repository and install dependencies
+
+```bash
+git clone https://github.com/stourgai/WPIT.git
+cd WPIT
+pip install -r requirements.txt
+```
+
+### Initialise SpacePy data files
+
+`append_ray` and the ray-path coordinate transforms require SpacePy's data files. Initialise them once after installation:
+
+```bash
+python -c "import spacepy.toolbox; spacepy.toolbox.update()"
+```
+
+### Start Jupyter and open a test notebook
+
+```bash
+jupyter notebook
+```
+
+In the browser, navigate to `WPIT_tests/` and open the notebook for the paper you want to reproduce. For example, to reproduce Bortnik et al. 2008:
+
+```
+WPIT_tests/Nonlinear interaction of energetic electrons with large amplitude chorus.ipynb
+```
+
+### Run all cells
+
+Use **Kernel → Restart & Run All** to execute the notebook from a clean state. Output figures will be saved to the `WPIT_tests/` directory alongside the reference PNG files already committed to the repository.
+
+### Compare with reference images
+
+Each test notebook generates figures that should visually match the committed reference PNGs:
+
+```
+WPIT_tests/Figure_2i_of_Bortnik_et_al_2008.png
+WPIT_tests/Figure_2j_of_Bortnik_et_al_2008.png
+WPIT_tests/Figure_2k_of_Bortnik_et_al_2008.png
+WPIT_tests/Figure_4a_of_Albert_and_Bortnik_2009.png
+...
+```
+
+</Steps>
+
+<Warning>
+The EMIC-ion notebooks (`Su et al. 2012`, `Su et al. 2014`) integrate trajectories over many bounce periods, which can take several minutes on a standard laptop. Avoid interrupting the kernel during integration to prevent corrupted output figures.
+</Warning>
+
+## Module descriptions and further tutorials
+
+In addition to the validation notebooks, the `Module_descriptions/` directory contains Jupyter notebooks with full analytical derivations and example calls for every module:
+
+| Notebook | Module covered |
+|---|---|
+| `Environment_mod_description.ipynb` | Densities, field, frequencies |
+| `WaveProperties_mod_description.ipynb` | Refractive index, Stix, wave amplitudes |
+| `whistler_electron_mod_description.ipynb` | Electron equations of motion |
+| `EMIC_ion_mod_description.ipynb` | Ion equations of motion |
+| `parallel_EMIC_mod_description.ipynb` | Parallel-propagating EMIC waves |
+| `LandauDamp_mod_description.ipynb` | Landau damping pipeline |

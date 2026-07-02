@@ -1,0 +1,692 @@
+---
+title: "parallel_EMIC_mod: Parallel EMIC–Ion Wave Interactions"
+sidebarTitle: "Parallel EMIC"
+description: "Full API reference for WPIT's parallel EMIC–ion sub-module: simplified equations of motion for ions interacting with field-aligned EMIC waves and nonlinear trapping diagnostics."
+---
+
+The `parallel_EMIC_mod` sub-module implements the relativistic equations of motion for a single ion interacting with a **parallel-propagating** Electromagnetic Ion Cyclotron (EMIC) wave, where the wave normal angle is exactly zero. Because the wave propagates purely along the background magnetic field **B₀**, there is no perpendicular wave vector component, the Bessel function argument beta vanishes identically, and the coupling reduces to a simpler form involving only the wave magnetic field amplitude and a phase velocity term. This makes the module computationally lighter than `EMIC_ion_mod` and appropriate for simulations that assume field-aligned propagation. The nonlinear trapping functions in this module also use a different formulation for `nonlinear_theta` — one that directly involves `Bw` rather than Bessel-weighted electric field components — reflecting the simplified dispersion geometry.
+
+```python
+import WPIT.WPI_mod.parallel_EMIC_mod as par_emic
+
+# Or import individual functions
+from WPIT.WPI_mod.parallel_EMIC_mod import (
+    dzdt, dlamdadt,
+    dppardt, dpperdt,
+    dEkdt, dgammadt,
+    dalphadt, daeqdt,
+    detadt,
+    nonlinear_H, nonlinear_S, nonlinear_theta,
+)
+```
+
+<Note>
+  Unlike `EMIC_ion_mod`, this module does **not** export `wpi_params`, `dkpardt`, or `dwcdt`, and it does not export `nonlinear_C0`, `nonlinear_C1m`, or `nonlinear_C1p`. The parallel geometry removes the need for Bessel-based coupling coefficients. `nonlinear_theta` uses a different signature here — it takes `Bw`, `kappa`, momenta, and particle properties rather than precomputed C coefficients.
+</Note>
+
+---
+
+## `dzdt`
+
+Returns the time rate of change of the field-line distance coordinate.
+
+```python
+dz_dt = par_emic.dzdt(ppar_arg, gamma_arg, mi_arg)
+```
+
+<ParamField body="ppar_arg" type="float">
+  Ion momentum component parallel to **B₀**, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Relativistic Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="mi_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ResponseField name="dz_dt" type="float">
+  Time derivative of the field-line coordinate `dz/dt = ppar / (gamma * mi)`, in m s⁻¹.
+</ResponseField>
+
+---
+
+## `dlamdadt`
+
+Returns the time rate of change of the magnetic latitude, accounting for dipole-field geometry via the `sqrt(1 + 3*sin^2(lambda)) * cos(lambda)` metric factor.
+
+```python
+dlamda_dt = par_emic.dlamdadt(ppar_arg, lamda_arg, gamma_arg, m_arg, L_arg)
+```
+
+<ParamField body="ppar_arg" type="float">
+  Parallel ion momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="lamda_arg" type="float">
+  Magnetic latitude lambda, in radians.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="m_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ParamField body="L_arg" type="float">
+  Magnetic L-shell value (dimensionless).
+</ParamField>
+
+<ResponseField name="dlamda_dt" type="float">
+  Time derivative of the magnetic latitude, in rad s⁻¹.
+</ResponseField>
+
+---
+
+## `dppardt`
+
+Returns the time rate of change of the parallel momentum. For parallel propagation the wave coupling enters through the wave magnetic field `Bw` directly rather than through decomposed left/right components.
+
+```python
+dppar_dt = par_emic.dppardt(
+    pper_arg, eta_arg, wc_arg, Bw_arg,
+    gamma_arg, dwcds_arg, q_arg, m_arg
+)
+```
+
+<ParamField body="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="eta_arg" type="float">
+  Wave–particle phase angle, in radians.
+</ParamField>
+
+<ParamField body="wc_arg" type="float">
+  Ion cyclotron frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="Bw_arg" type="float">
+  Wave magnetic field amplitude, in T.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="dwcds_arg" type="float">
+  Spatial derivative of the cyclotron frequency along the field line, in rad m⁻¹ s⁻¹.
+</ParamField>
+
+<ParamField body="q_arg" type="float">
+  Ion charge, in Coulombs.
+</ParamField>
+
+<ParamField body="m_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ResponseField name="dppar_dt" type="float">
+  Time derivative of the parallel momentum `dppar/dt`, in kg m s⁻².
+</ResponseField>
+
+---
+
+## `dpperdt`
+
+Returns the time rate of change of the perpendicular momentum. The wave term involves the difference between the particle's parallel velocity and the wave phase velocity `w/k`.
+
+```python
+dpper_dt = par_emic.dpperdt(
+    ppar_arg, pper_arg, eta_arg, Bw_arg,
+    gamma_arg, wmega_arg, kappa_arg,
+    wc_arg, dwcds_arg, q_arg, m_arg
+)
+```
+
+<ParamField body="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="eta_arg" type="float">
+  Wave–particle phase angle, in radians.
+</ParamField>
+
+<ParamField body="Bw_arg" type="float">
+  Wave magnetic field amplitude, in T.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="wmega_arg" type="float">
+  Wave angular frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="kappa_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField body="wc_arg" type="float">
+  Ion cyclotron frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="dwcds_arg" type="float">
+  Spatial derivative of the cyclotron frequency along the field line, in rad m⁻¹ s⁻¹.
+</ParamField>
+
+<ParamField body="q_arg" type="float">
+  Ion charge, in Coulombs.
+</ParamField>
+
+<ParamField body="m_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ResponseField name="dpper_dt" type="float">
+  Time derivative of the perpendicular momentum `dpper/dt`, in kg m s⁻².
+</ResponseField>
+
+---
+
+## `dEkdt`
+
+Returns the time rate of change of the relativistic kinetic energy. For parallel EMIC waves the energy exchange rate depends on the phase velocity `w/kappa` and the perpendicular momentum.
+
+```python
+dEk_dt = par_emic.dEkdt(
+    pper_arg, eta_arg, gamma_arg,
+    Bw_arg, kappa_arg, w_arg, q_arg, m_arg
+)
+```
+
+<ParamField body="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="eta_arg" type="float">
+  Wave–particle phase angle, in radians.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="Bw_arg" type="float">
+  Wave magnetic field amplitude, in T.
+</ParamField>
+
+<ParamField body="kappa_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField body="w_arg" type="float">
+  Wave angular frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="q_arg" type="float">
+  Ion charge, in Coulombs.
+</ParamField>
+
+<ParamField body="m_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ResponseField name="dEk_dt" type="float">
+  Time derivative of kinetic energy: `dEk/dt = (1/(gamma*m)) * q * pper * Bw * (w/kappa) * sin(eta)`, in J s⁻¹.
+</ResponseField>
+
+---
+
+## `dgammadt`
+
+Returns the time rate of change of the Lorentz factor.
+
+```python
+dgamma_dt = par_emic.dgammadt(
+    pper_arg, eta_arg, gamma_arg,
+    Bw_arg, kappa_arg, w_arg, q_arg, m_arg
+)
+```
+
+<ParamField body="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="eta_arg" type="float">
+  Wave–particle phase angle, in radians.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="Bw_arg" type="float">
+  Wave magnetic field amplitude, in T.
+</ParamField>
+
+<ParamField body="kappa_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField body="w_arg" type="float">
+  Wave angular frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="q_arg" type="float">
+  Ion charge, in Coulombs.
+</ParamField>
+
+<ParamField body="m_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ResponseField name="dgamma_dt" type="float">
+  Time derivative of the Lorentz factor, in s⁻¹.
+</ResponseField>
+
+---
+
+## `dalphadt`
+
+Returns the time rate of change of the local pitch angle, including both the wave-driven term and the adiabatic drift term due to the field gradient.
+
+```python
+dalpha_dt = par_emic.dalphadt(
+    ppar_arg, pper_arg, eta_arg, gamma_arg,
+    wce_arg, dwcds_arg, w_wave_arg,
+    kappa_arg, Bw_arg, m_arg, q_arg
+)
+```
+
+<ParamField body="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="eta_arg" type="float">
+  Wave–particle phase angle, in radians.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="wce_arg" type="float">
+  Ion cyclotron frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="dwcds_arg" type="float">
+  Spatial derivative of the cyclotron frequency along the field line, in rad m⁻¹ s⁻¹.
+</ParamField>
+
+<ParamField body="w_wave_arg" type="float">
+  Wave angular frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="kappa_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField body="Bw_arg" type="float">
+  Wave magnetic field amplitude, in T.
+</ParamField>
+
+<ParamField body="m_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ParamField body="q_arg" type="float">
+  Ion charge, in Coulombs.
+</ParamField>
+
+<ResponseField name="dalpha_dt" type="float">
+  Time derivative of the local pitch angle, in rad s⁻¹.
+</ResponseField>
+
+---
+
+## `daeqdt`
+
+Returns the time rate of change of the equatorial pitch angle for a parallel EMIC wave. The mapping from local to equatorial pitch angle change uses the ratio `tan(aeq)/tan(alpha)`.
+
+```python
+daeq_dt = par_emic.daeqdt(
+    ppar_arg, pper_arg, eta_arg, gamma_arg,
+    w_wave_arg, kappa_arg, Bw_arg,
+    aeq_arg, alpha_arg, m_arg, q_arg
+)
+```
+
+<ParamField body="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="eta_arg" type="float">
+  Wave–particle phase angle, in radians.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="w_wave_arg" type="float">
+  Wave angular frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="kappa_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField body="Bw_arg" type="float">
+  Wave magnetic field amplitude, in T.
+</ParamField>
+
+<ParamField body="aeq_arg" type="float">
+  Equatorial pitch angle, in radians.
+</ParamField>
+
+<ParamField body="alpha_arg" type="float">
+  Local pitch angle, in radians.
+</ParamField>
+
+<ParamField body="m_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ParamField body="q_arg" type="float">
+  Ion charge, in Coulombs.
+</ParamField>
+
+<ResponseField name="daeq_dt" type="float">
+  Time derivative of the equatorial pitch angle, in rad s⁻¹.
+</ResponseField>
+
+---
+
+## `detadt`
+
+Returns the time rate of change of the wave–particle phase angle eta. Accepts a species flag `s` to switch the sign of the cyclotron term between ions and electrons.
+
+```python
+deta_dt = par_emic.detadt(
+    ppar_arg, pper_arg, eta_arg, Bw_arg,
+    wmega_arg, kappa_arg, wc_arg,
+    gamma_arg, q_arg, m_arg, s
+)
+```
+
+<ParamField body="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="eta_arg" type="float">
+  Wave–particle phase angle, in radians.
+</ParamField>
+
+<ParamField body="Bw_arg" type="float">
+  Wave magnetic field amplitude, in T.
+</ParamField>
+
+<ParamField body="wmega_arg" type="float">
+  Wave angular frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="kappa_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField body="wc_arg" type="float">
+  Ion cyclotron frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="q_arg" type="float">
+  Ion charge, in Coulombs.
+</ParamField>
+
+<ParamField body="m_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ParamField body="s" type="str">
+  Species selector. Use `'ion'` for proton/helium/oxygen (cyclotron term sign `+1`) or `'electron'` (cyclotron term sign `-1`).
+</ParamField>
+
+<ResponseField name="deta_dt" type="float">
+  Time derivative of the wave–particle phase, in rad s⁻¹.
+</ResponseField>
+
+---
+
+## Nonlinear trapping diagnostics
+
+The three nonlinear functions compute the phase-trapping diagnostics for parallel EMIC waves. The `nonlinear_theta` function has a different signature from the oblique module: it directly computes the trapping frequency squared from the wave amplitude and momentum, without the Bessel-function decomposition used in `EMIC_ion_mod`.
+
+### `nonlinear_H`
+
+Computes the nonlinear Hamiltonian H, which captures the departure from exact resonance due to field and wave inhomogeneity.
+
+```python
+H = par_emic.nonlinear_H(
+    pper_arg, ppar_arg, kappa_arg, gamma_arg,
+    m_arg, wce_arg, dk_dt_arg, dwcdz_arg, dwdt_arg
+)
+```
+
+<ParamField body="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="kappa_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="m_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ParamField body="wce_arg" type="float">
+  Ion cyclotron frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="dk_dt_arg" type="float">
+  Time derivative of the parallel wave number, in rad m⁻¹ s⁻¹.
+</ParamField>
+
+<ParamField body="dwcdz_arg" type="float">
+  Spatial gradient of the cyclotron frequency along the field line, in rad m⁻¹ s⁻¹.
+</ParamField>
+
+<ParamField body="dwdt_arg" type="float">
+  Time derivative of the wave frequency (zero for monochromatic wave), in rad s⁻².
+</ParamField>
+
+<ResponseField name="H" type="float">
+  Nonlinear trapping Hamiltonian H. Pass together with `wtsq` to `nonlinear_S`.
+</ResponseField>
+
+<Note>
+  Compared with `EMIC_ion_mod.nonlinear_H`, the sign on the cyclotron inhomogeneity term is negated: `fac1 = -(1/gamma) * dwc_dt`, reflecting the ion-resonance convention for parallel propagation.
+</Note>
+
+---
+
+### `nonlinear_S`
+
+Computes the dimensionless trapping parameter S.
+
+```python
+S = par_emic.nonlinear_S(H_arg, wtsq_arg)
+```
+
+<ParamField body="H_arg" type="float">
+  The nonlinear Hamiltonian H from `nonlinear_H`.
+</ParamField>
+
+<ParamField body="wtsq_arg" type="float">
+  The trapping frequency squared from `nonlinear_theta` (in rad² s⁻²).
+</ParamField>
+
+<ResponseField name="S" type="float">
+  Dimensionless trapping parameter `S = H / wtsq`. Phase trapping is indicated by |S| less than 1.
+</ResponseField>
+
+---
+
+### `nonlinear_theta`
+
+Computes the nonlinear trapping coupling term and trapping frequency squared directly from the wave amplitude and particle momentum. No Bessel functions are required for parallel propagation.
+
+```python
+theta, wtsq = par_emic.nonlinear_theta(
+    pper_arg, ppar_arg, Bw_arg, kappa_arg,
+    gamma_arg, m_arg, q_arg, wce_arg, w_arg
+)
+```
+
+<ParamField body="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField body="Bw_arg" type="float">
+  Wave magnetic field amplitude, in T.
+</ParamField>
+
+<ParamField body="kappa_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField body="gamma_arg" type="float">
+  Lorentz factor (dimensionless).
+</ParamField>
+
+<ParamField body="m_arg" type="float">
+  Ion rest mass, in kg.
+</ParamField>
+
+<ParamField body="q_arg" type="float">
+  Ion charge, in Coulombs.
+</ParamField>
+
+<ParamField body="wce_arg" type="float">
+  Ion cyclotron frequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField body="w_arg" type="float">
+  Wave angular frequency, in rad s⁻¹.
+</ParamField>
+
+<ResponseField name="theta" type="float">
+  Nonlinear coupling term theta (SI units). Combines the wave-magnetic force and relativistic correction.
+</ResponseField>
+
+<ResponseField name="wtsq" type="float">
+  Trapping frequency squared `|theta|` (in rad² s⁻²), for use as `wtsq_arg` in `nonlinear_S`.
+</ResponseField>
+
+---
+
+## Comparison with oblique EMIC_ion_mod
+
+The table below summarises the key differences between the two EMIC sub-modules.
+
+| Feature | `parallel_EMIC_mod` | `EMIC_ion_mod` |
+|---|---|---|
+| Wave normal angle | Zero (field-aligned) | Arbitrary oblique angle |
+| Bessel functions | Not needed | Jm, Jm±1 via `beta` |
+| `wpi_params` | Not available | Required per step |
+| Coupling params | Direct Bw, w/k terms | C0, C1p, C1m coefficients |
+| `dkpardt` | Not available | Available |
+| `dwcdt` | Not available | Available |
+| `detadt` species flag | `s='ion'` or `'electron'` | Not present |
+
+---
+
+## Complete integration step example
+
+```python
+import numpy as np
+import WPIT.WPI_mod.parallel_EMIC_mod as par_emic
+from WPIT.Environment_mod import const
+
+# --- Ion species: proton ---
+mi = const.mH
+qi = const.qi
+
+# --- State vector at time t ---
+ppar   = 1.1e-19     # parallel momentum [kg m/s]
+pper   = 2.8e-19     # perpendicular momentum [kg m/s]
+lamda  = np.deg2rad(4.0)
+eta    = 0.5         # wave-particle phase [rad]
+aeq    = np.deg2rad(55.0)
+alpha  = np.deg2rad(50.0)   # local pitch angle [rad]
+L_shell = 4.0
+
+# --- Background field ---
+Bmag   = 160e-9      # |B0| in T
+wc     = qi * Bmag / mi          # non-relativistic cyclotron frequency
+dwcds  = 6.0                     # d(wc)/dz [rad/m/s]
+
+# --- Wave parameters (parallel propagation) ---
+Bw      = 6e-9       # wave magnetic field [T]
+w_wave  = 0.25 * wc  # wave frequency [rad/s]
+kappa   = 2.5e-5     # wave number [rad/m]
+
+# --- Lorentz factor ---
+p_tot = np.sqrt(ppar**2 + pper**2)
+gamma = np.sqrt(1 + (p_tot / (mi * const.c_light))**2)
+
+# --- Equations of motion ---
+dz     = par_emic.dzdt(ppar, gamma, mi)
+dlamda = par_emic.dlamdadt(ppar, lamda, gamma, mi, L_shell)
+dppar  = par_emic.dppardt(pper, eta, wc, Bw, gamma, dwcds, qi, mi)
+dpper  = par_emic.dpperdt(ppar, pper, eta, Bw, gamma, w_wave, kappa, wc, dwcds, qi, mi)
+dEk    = par_emic.dEkdt(pper, eta, gamma, Bw, kappa, w_wave, qi, mi)
+dgam   = par_emic.dgammadt(pper, eta, gamma, Bw, kappa, w_wave, qi, mi)
+dalpha_dt = par_emic.dalphadt(ppar, pper, eta, gamma, wc, dwcds, w_wave, kappa, Bw, mi, qi)
+daeq   = par_emic.daeqdt(ppar, pper, eta, gamma, w_wave, kappa, Bw, aeq, alpha, mi, qi)
+deta   = par_emic.detadt(ppar, pper, eta, Bw, w_wave, kappa, wc, gamma, qi, mi, 'ion')
+
+# --- Nonlinear trapping ---
+theta_val, wtsq = par_emic.nonlinear_theta(pper, ppar, Bw, kappa, gamma, mi, qi, wc, w_wave)
+H = par_emic.nonlinear_H(pper, ppar, kappa, gamma, mi, wc, 0.0, dwcds, 0.0)
+S = par_emic.nonlinear_S(H, wtsq)
+
+print(f"deta/dt = {deta:.4e} rad/s")
+print(f"S = {S:.4f}  ({'trapped' if abs(S) < 1 else 'librating'})")
+```

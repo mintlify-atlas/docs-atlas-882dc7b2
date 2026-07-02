@@ -1,0 +1,774 @@
+---
+title: "Dispersion Relations & Stix Parameters — WPIT Wave"
+sidebarTitle: "Dispersion"
+description: "Cold and warm Stix parameters, dielectric tensors, R/L/O/X dispersion relations, and L/R cutoff frequencies in WPIT's WaveProperties_mod module."
+---
+
+The dispersion subgroup of `WaveProperties_mod` covers everything needed to characterise how electromagnetic waves propagate in a magnetised multi-species plasma: computing the Stix parameters S, D, P, R, L in both cold and warm limits; assembling the full cold or warm 3×3 dielectric tensor; and evaluating the squared refractive index η² and wave number κ for the four principal modes (R, L, O, X) plus free-space light. Cutoff-frequency helpers for the R and L modes are also provided.
+
+```python
+import WPIT.WaveProperties_mod as wave
+```
+
+---
+
+## `stix_parameters`
+
+Computes the five cold-plasma Stix parameters from plasma densities and the background magnetic field magnitude. Internally the function derives plasma and cyclotron frequencies for electrons, H⁺, He⁺, and O⁺ from fundamental constants before assembling R, L, P, S, and D.
+
+**Reference:** Stix, T. H. (1992). *Waves in Plasmas*. Springer Science & Business Media.
+
+```python
+S, D, P, R, L = wave.stix_parameters(
+    w_arg, Ne_arg, NH_arg, NHe_arg, NO_arg, B0mag_arg
+)
+```
+
+### Parameters
+
+<ParamField path="w_arg" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="Ne_arg" type="float" required>
+  Electron number density [m⁻³].
+</ParamField>
+
+<ParamField path="NH_arg" type="float" required>
+  H⁺ number density [m⁻³]. Pass `0` if hydrogen ions are absent.
+</ParamField>
+
+<ParamField path="NHe_arg" type="float" required>
+  He⁺ number density [m⁻³]. Pass `0` if helium ions are absent.
+</ParamField>
+
+<ParamField path="NO_arg" type="float" required>
+  O⁺ number density [m⁻³]. Pass `0` if oxygen ions are absent.
+</ParamField>
+
+<ParamField path="B0mag_arg" type="float" required>
+  Background magnetic field magnitude [T].
+</ParamField>
+
+### Returns
+
+<ResponseField name="Sstix" type="float">
+  Stix S parameter — arithmetic mean of R and L: `S = (R + L) / 2`.
+</ResponseField>
+
+<ResponseField name="Dstix" type="float">
+  Stix D parameter — half the difference of R and L: `D = (R − L) / 2`.
+</ResponseField>
+
+<ResponseField name="Pstix" type="float">
+  Stix P parameter — parallel (to **B₀**) dielectric response; equals `1 − Σ ωₚₛ² / ω²`.
+</ResponseField>
+
+<ResponseField name="Rstix" type="float">
+  Stix R parameter — right-hand resonance factor; diverges at the electron cyclotron frequency.
+</ResponseField>
+
+<ResponseField name="Lstix" type="float">
+  Stix L parameter — left-hand resonance factor; diverges at the ion cyclotron frequencies.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w   = 2 * np.pi * 5e3          # 5 kHz wave
+Ne  = 1e7                       # m^-3
+NH  = 0.9e7
+NHe = 0.05e7
+NO  = 0.05e7
+B0  = 3e-5                      # 30 µT (typical inner magnetosphere)
+
+S, D, P, R, L = wave.stix_parameters(w, Ne, NH, NHe, NO, B0)
+print(f"S={S:.4f}  D={D:.4f}  P={P:.4f}  R={R:.4f}  L={L:.4f}")
+```
+
+---
+
+## `stix_parameters_warm`
+
+Applies finite-temperature (warm plasma) corrections to the cold Stix parameters using the warm dielectric tensor components computed by `warm_dielectric_tensor`. The correction is proportional to the dimensionless thermal parameter τ = (k_B T)/(m c²) × η².
+
+**Reference:** Maxworth, A. and Gołkowski, M. (2017). *Journal of Geophysical Research: Space Physics* 122, 7323–7335.
+
+```python
+S_w, D_w, P_w, R_w, L_w = wave.stix_parameters_warm(
+    S_cold, D_cold, P_cold, Te, Ti, mu_warm, Ke, KH, KHe, KO
+)
+```
+
+### Parameters
+
+<ParamField path="S_cold" type="float" required>
+  Cold-plasma Stix S parameter (from `stix_parameters`).
+</ParamField>
+
+<ParamField path="D_cold" type="float" required>
+  Cold-plasma Stix D parameter.
+</ParamField>
+
+<ParamField path="P_cold" type="float" required>
+  Cold-plasma Stix P parameter.
+</ParamField>
+
+<ParamField path="Te" type="float" required>
+  Electron temperature [eV].
+</ParamField>
+
+<ParamField path="Ti" type="float" required>
+  Ion temperature [eV] (applied uniformly to H⁺, He⁺, and O⁺).
+</ParamField>
+
+<ParamField path="mu_warm" type="float" required>
+  Warm-plasma refractive index η (dimensionless), used to form τ = (k_B T / m c²) η².
+</ParamField>
+
+<ParamField path="Ke" type="list[complex]" required>
+  Electron warm dielectric tensor components as a flat 9-element list `[K11, K12, ..., K33]`
+  (output of `warm_dielectric_tensor`).
+</ParamField>
+
+<ParamField path="KH" type="list[complex]" required>
+  H⁺ warm dielectric tensor components (same layout as `Ke`).
+</ParamField>
+
+<ParamField path="KHe" type="list[complex]" required>
+  He⁺ warm dielectric tensor components.
+</ParamField>
+
+<ParamField path="KO" type="list[complex]" required>
+  O⁺ warm dielectric tensor components.
+</ParamField>
+
+### Returns
+
+<ResponseField name="S_warm" type="float">
+  Temperature-corrected Stix S.
+</ResponseField>
+
+<ResponseField name="D_warm" type="float">
+  Temperature-corrected Stix D.
+</ResponseField>
+
+<ResponseField name="P_warm" type="float">
+  Temperature-corrected Stix P.
+</ResponseField>
+
+<ResponseField name="R_warm" type="float">
+  Temperature-corrected Stix R = S_warm + D_warm.
+</ResponseField>
+
+<ResponseField name="L_warm" type="float">
+  Temperature-corrected Stix L = S_warm − D_warm.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+# Assume cold parameters and warm tensor already computed
+S_cold, D_cold, P_cold = 15.2, -0.3, -120.0
+Te, Ti = 1.0, 0.5         # eV
+mu_warm = 5.0             # dimensionless refractive index
+
+# Ke, KH, KHe, KO obtained from warm_dielectric_tensor(...)
+S_w, D_w, P_w, R_w, L_w = wave.stix_parameters_warm(
+    S_cold, D_cold, P_cold, Te, Ti, mu_warm, Ke, KH, KHe, KO
+)
+```
+
+---
+
+## `cold_dielectric_tensor`
+
+Computes all nine components of the cold-plasma dielectric tensor K for a multi-species plasma. The tensor is Hermitian — K₁₃ = K₂₃ = K₃₁ = K₃₂ = 0 for a cold plasma in a uniform background field aligned with z, and K₁₁ = K₂₂ while K₂₁ = −K₁₂.
+
+**Reference:** Maxworth, A. S., et al. (2020). *Journal of Geophysical Research: Space Physics* 125(4), e2019JA027154.
+
+```python
+K_e, K_H, K_He, K_O = wave.warm_dielectric_tensor(
+    w_wave, wce_arg, wpe_arg,
+    wcH_arg, wpH_arg, wcHe_arg, wpHe_arg, wcO_arg, wpO_arg, psi_arg
+)
+
+K11, K12, K13, K21, K22, K23, K31, K32, K33 = wave.cold_dielectric_tensor(
+    w_wave, wce_arg, wpe_arg,
+    wcH_arg, wpH_arg, wcHe_arg, wpHe_arg, wcO_arg, wpO_arg
+)
+```
+
+### Parameters
+
+<ParamField path="w_wave" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wce_arg" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹]. Defined as `q_e B₀ / m_e`.
+</ParamField>
+
+<ParamField path="wpe_arg" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wcH_arg" type="float" required>
+  H⁺ cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpH_arg" type="float" required>
+  H⁺ plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wcHe_arg" type="float" required>
+  He⁺ cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpHe_arg" type="float" required>
+  He⁺ plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wcO_arg" type="float" required>
+  O⁺ cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpO_arg" type="float" required>
+  O⁺ plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+### Returns
+
+<ResponseField name="K_11 … K_33" type="complex">
+  Nine individual tensor components. For a cold plasma with **B₀** ∥ ẑ the nonzero
+  independent components are K₁₁ (= K₂₂), K₁₂ (purely imaginary), and K₃₃.
+  All off-diagonal z-coupling terms (K₁₃, K₂₃, K₃₁, K₃₂) are identically zero.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w      = 2 * np.pi * 5e3
+wce    = 2 * np.pi * 1.4e6      # ~1.4 MHz at 30 µT
+wpe    = 2 * np.pi * 1.0e5
+wcH    = wce / 1836.0
+wpH    = wpe / np.sqrt(1836.0)
+wcHe   = wce / (4 * 1836.0)
+wpHe   = 0.0
+wcO    = wce / (16 * 1836.0)
+wpO    = 0.0
+
+K11, K12, K13, K21, K22, K23, K31, K32, K33 = wave.cold_dielectric_tensor(
+    w, wce, wpe, wcH, wpH, wcHe, wpHe, wcO, wpO
+)
+```
+
+---
+
+## `warm_dielectric_tensor`
+
+Computes warm-plasma dielectric tensor corrections for each ion species and electrons. The tensor components account for finite Larmor radius effects via the wave normal angle `psi_arg`. The function returns four lists, each a 9-element flat array indexed as [K₁₁, K₁₂, K₁₃, K₂₁, K₂₂, K₂₃, K₃₁, K₃₂, K₃₃].
+
+**Reference:** Maxworth & Gołkowski (2017). *JGR: Space Physics* 122, 7323–7335.
+
+```python
+K_e, K_H, K_He, K_O = wave.warm_dielectric_tensor(
+    w_wave, wce_arg, wpe_arg,
+    wcH_arg, wpH_arg, wcHe_arg, wpHe_arg, wcO_arg, wpO_arg, psi_arg
+)
+```
+
+### Parameters
+
+<ParamField path="w_wave" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wce_arg" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpe_arg" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wcH_arg" type="float" required>
+  H⁺ cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpH_arg" type="float" required>
+  H⁺ plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wcHe_arg" type="float" required>
+  He⁺ cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpHe_arg" type="float" required>
+  He⁺ plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wcO_arg" type="float" required>
+  O⁺ cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpO_arg" type="float" required>
+  O⁺ plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="psi_arg" type="float" required>
+  Wave normal angle [rad] with respect to **B₀**.
+</ParamField>
+
+### Returns
+
+<ResponseField name="K_e" type="list[complex]">
+  9-element list of electron warm-correction tensor components.
+</ResponseField>
+
+<ResponseField name="K_H" type="list[complex]">
+  9-element list of H⁺ warm-correction tensor components.
+</ResponseField>
+
+<ResponseField name="K_He" type="list[complex]">
+  9-element list of He⁺ warm-correction tensor components.
+</ResponseField>
+
+<ResponseField name="K_O" type="list[complex]">
+  9-element list of O⁺ warm-correction tensor components.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+psi = np.deg2rad(30)   # 30° wave normal angle
+
+K_e, K_H, K_He, K_O = wave.warm_dielectric_tensor(
+    w, wce, wpe, wcH, wpH, wcHe, wpHe, wcO, wpO, psi
+)
+print("K11_electron =", K_e[0])
+print("K33_electron =", K_e[8])
+```
+
+---
+
+## `dispersion_R`
+
+Evaluates the R-mode (right-hand, extraordinary, whistler-branch) dispersion relation for a multi-species cold plasma. The R-mode is right-hand circularly polarised for parallel propagation and connects to the whistler mode at sub-electron-cyclotron frequencies.
+
+**Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
+
+```python
+nsq, kappa = wave.dispersion_R(w, wpe, wce, wpH, wcH, wpHe, wcHe, wpO, wcO)
+```
+
+### Parameters
+
+<ParamField path="w" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpe" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wce" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpH" type="float" required>
+  H⁺ plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wcH" type="float" required>
+  H⁺ cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpHe" type="float" required>
+  He⁺ plasma angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+<ParamField path="wcHe" type="float" required>
+  He⁺ cyclotron angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+<ParamField path="wpO" type="float" required>
+  O⁺ plasma angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+<ParamField path="wcO" type="float" required>
+  O⁺ cyclotron angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+### Returns
+
+<ResponseField name="nsq_tmp" type="float">
+  Squared refractive index η² = n² for the R mode (dimensionless).
+  Positive values indicate a propagating wave; negative values indicate evanescence.
+</ResponseField>
+
+<ResponseField name="kappa_tmp" type="float">
+  Wave number κ = η ω / c [m⁻¹]. Computed as `sqrt(ω² η² / c²)`.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w   = 2 * np.pi * 5e3
+wpe = 2 * np.pi * 1.0e5
+wce = 2 * np.pi * 1.4e6
+wpH = wpe / np.sqrt(1836.0)
+wcH = wce / 1836.0
+
+nsq, kappa = wave.dispersion_R(w, wpe, wce, wpH, wcH, 0, 0, 0, 0)
+print(f"eta^2 = {nsq:.2f},  kappa = {kappa:.4e} m^-1")
+```
+
+<Note>
+  The R-mode becomes evanescent (η² < 0) below the R-mode cutoff frequency ω_R and above
+  the electron cyclotron frequency ω_ce. Use `cutoff_R` to find the lower propagation boundary.
+</Note>
+
+---
+
+## `dispersion_L`
+
+Evaluates the L-mode (left-hand circularly polarised, parallel propagation) dispersion relation for a multi-species cold plasma. The L mode resonates at the ion cyclotron frequencies and is relevant for EMIC wave modelling.
+
+**Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
+
+```python
+nsq, kappa = wave.dispersion_L(w, wpe, wce, wpH, wcH, wpHe, wcHe, wpO, wcO)
+```
+
+### Parameters
+
+<ParamField path="w" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpe" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wce" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpH" type="float" required>
+  H⁺ plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wcH" type="float" required>
+  H⁺ cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpHe" type="float" required>
+  He⁺ plasma angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+<ParamField path="wcHe" type="float" required>
+  He⁺ cyclotron angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+<ParamField path="wpO" type="float" required>
+  O⁺ plasma angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+<ParamField path="wcO" type="float" required>
+  O⁺ cyclotron angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+### Returns
+
+<ResponseField name="nsq_tmp" type="float">
+  Squared refractive index η² for the L mode (dimensionless).
+</ResponseField>
+
+<ResponseField name="kappa_tmp" type="float">
+  Wave number κ [m⁻¹].
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w_emic = 2 * np.pi * 0.5     # 0.5 Hz EMIC wave
+wcH    = 2 * np.pi * 0.6     # H+ cyclotron ~0.6 Hz at 40 nT
+
+nsq, kappa = wave.dispersion_L(w_emic, wpe, wce, wpH, wcH, wpHe, wcHe, wpO, wcO)
+```
+
+<Note>
+  The L-mode resonates (η² → ∞) at each ion cyclotron frequency. The wave is evanescent
+  below the L-mode cutoff ω_L. Use `cutoff_L` to locate this boundary.
+</Note>
+
+---
+
+## `dispersion_O`
+
+Evaluates the O-mode (ordinary mode, electric field polarised parallel to **B₀**) dispersion relation. The O-mode is independent of the magnetic field; it propagates when ω > ωₚₑ (total).
+
+**Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
+
+```python
+nsq, kappa = wave.dispersion_O(w, wpe, wpH, wpHe, wpO)
+```
+
+### Parameters
+
+<ParamField path="w" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpe" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpH" type="float" required>
+  H⁺ plasma angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+<ParamField path="wpHe" type="float" required>
+  He⁺ plasma angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+<ParamField path="wpO" type="float" required>
+  O⁺ plasma angular frequency [rad s⁻¹]. Pass `0` if absent.
+</ParamField>
+
+### Returns
+
+<ResponseField name="nsq_tmp" type="float">
+  Squared refractive index η² = 1 − Σ ωₚₛ² / ω² (dimensionless).
+</ResponseField>
+
+<ResponseField name="kappa_tmp" type="float">
+  Wave number κ [m⁻¹].
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w   = 2 * np.pi * 2e6          # 2 MHz
+wpe = 2 * np.pi * 1.5e6        # plasma freq below wave freq
+
+nsq, kappa = wave.dispersion_O(w, wpe, 0, 0, 0)
+print(f"O-mode eta^2 = {nsq:.4f}")
+```
+
+---
+
+## `dispersion_X`
+
+Evaluates the X-mode (extra-ordinary mode, perpendicular propagation) dispersion relation using the lower hybrid resonance frequency `wlh` as input. The X-mode exists in two distinct pass bands separated by the upper hybrid resonance and the plasma frequency.
+
+**Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
+
+```python
+nsq, kappa = wave.dispersion_X(w, wpe, wlh)
+```
+
+### Parameters
+
+<ParamField path="w" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpe" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wlh" type="float" required>
+  Lower hybrid resonance angular frequency [rad s⁻¹].
+</ParamField>
+
+### Returns
+
+<ResponseField name="nsq_tmp" type="float">
+  Squared refractive index η² for the X mode (dimensionless).
+</ResponseField>
+
+<ResponseField name="kappa_tmp" type="float">
+  Wave number κ [m⁻¹].
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+wpe = 2 * np.pi * 1.0e5
+wce = 2 * np.pi * 1.4e6
+wcH = wce / 1836.0
+wlh = np.sqrt(wce * wcH)       # approx. lower hybrid resonance
+w   = 2 * np.pi * 5e3
+
+nsq, kappa = wave.dispersion_X(w, wpe, wlh)
+```
+
+<Note>
+  The argument labelled `wuhr_arg` in the task spec maps to `wlh` in the actual source code —
+  the function takes the **lower** hybrid resonance frequency, not the upper hybrid resonance.
+</Note>
+
+---
+
+## `dispersion_light`
+
+Returns the squared refractive index and wave number for a free-space electromagnetic (light) wave in an unmagnetised plasma. This is equivalent to the O-mode for electron-only plasma with η² = 1 − ωₚₑ²/ω².
+
+**Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
+
+```python
+nsq, kappa = wave.dispersion_light(w, wpe, wce)
+```
+
+### Parameters
+
+<ParamField path="w" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpe" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wce" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹]. Accepted but not used in the calculation;
+  included for interface consistency.
+</ParamField>
+
+### Returns
+
+<ResponseField name="nsq_tmp" type="float">
+  Squared refractive index η² = (ω² − ωₚₑ²) / ω² (dimensionless).
+</ResponseField>
+
+<ResponseField name="kappa_tmp" type="float">
+  Wave number κ = sqrt((ω² − ωₚₑ²) / c²) [m⁻¹].
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+wpe = 2 * np.pi * 1.0e5
+wce = 2 * np.pi * 1.4e6
+w   = 2 * np.pi * 3.0e5        # 300 kHz
+
+nsq, kappa = wave.dispersion_light(w, wpe, wce)
+```
+
+---
+
+## `cutoff_L`
+
+Computes the L-mode cutoff angular frequency ω_L, below which the L mode is evanescent.
+The formula is ω_L = ½(−ω_ce + √(ω_ce² + 4 ω_pe²)).
+
+**Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
+
+```python
+omega_L_cutoff = wave.cutoff_L(wce, wpe)
+```
+
+### Parameters
+
+<ParamField path="wce" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpe" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+### Returns
+
+<ResponseField name="tmp" type="float">
+  L-mode cutoff angular frequency [rad s⁻¹].
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+wce = 2 * np.pi * 1.4e6
+wpe = 2 * np.pi * 1.0e5
+
+omega_Lc = wave.cutoff_L(wce, wpe)
+print(f"L cutoff: {omega_Lc / (2*np.pi):.3e} Hz")
+```
+
+---
+
+## `cutoff_R`
+
+Computes the R-mode cutoff angular frequency ω_R, below which the R mode is evanescent.
+The formula is ω_R = ½(ω_ce + √(ω_ce² + 4 ω_pe²)).
+
+**Reference:** Swanson, D. G. (2012). *Plasma Waves*. Elsevier.
+
+```python
+omega_R_cutoff = wave.cutoff_R(wce, wpe)
+```
+
+### Parameters
+
+<ParamField path="wce" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpe" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+### Returns
+
+<ResponseField name="tmp" type="float">
+  R-mode cutoff angular frequency [rad s⁻¹].
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+wce = 2 * np.pi * 1.4e6
+wpe = 2 * np.pi * 1.0e5
+
+omega_Rc = wave.cutoff_R(wce, wpe)
+print(f"R cutoff: {omega_Rc / (2*np.pi):.3e} Hz")
+```
+
+<Note>
+  By construction, ω_R > ω_ce > ω_L > 0 when ω_pe > 0. The whistler mode propagates
+  between ω_L and ω_ce on the R-mode branch.
+</Note>

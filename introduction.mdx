@@ -1,0 +1,61 @@
+---
+title: "WPIT: Wave-Particle Interactions Toolset for Python"
+sidebarTitle: "Introduction"
+description: "WPIT: open-source Python toolset for magnetospheric wave-particle simulations covering environment, wave theory, particle dynamics, and Landau damping."
+---
+
+WPIT (Wave-Particle Interactions Toolset) is an open-source, Python-based collection of routines for modelling the interactions between energetic charged particles and electromagnetic waves in Earth's inner magnetosphere. Rather than providing a single monolithic simulation, WPIT gathers the key equations and parameterizations used by different wave-particle interaction models into a coherent, traceable library — one that can be run interactively in Jupyter Notebooks or imported piecemeal into an independent simulation pipeline. The toolset was introduced in the peer-reviewed publication by Tourgaidis, S., & Sarris, T., *Wave-Particle Interactions Toolset (WPIT): a Python-based toolset to model wave-particle interactions in the magnetosphere*, Frontiers in Astronomy and Space Sciences, 295, and is distributed under the Creative Commons Attribution License (CC BY).
+
+## What WPIT Does
+
+Wave-particle interactions drive dramatic changes in the radiation belts: whistler-mode chorus waves scatter electrons into the loss cone, electromagnetic ion cyclotron (EMIC) waves precipitate ring-current ions, and Landau damping determines how far a wave packet travels before its energy is absorbed by the background plasma. Simulating these effects requires accurate representations of (1) the background magnetospheric environment, (2) wave propagation and polarization in cold or warm plasma, and (3) the gyro-averaged equations of motion that couple the wave fields to individual particle trajectories.
+
+WPIT provides all three components in a single repository. You can use it as a **stand-alone simulation tool**, running the bundled Jupyter Notebooks to reproduce published results or carry out new parameter studies, or as a **library of routines** that you extract and embed inside a larger simulation framework.
+
+## Modules
+
+<CardGroup cols={2}>
+  <Card title="Environment_mod" icon="globe">
+    Geomagnetic dipole field, plasma density models (Sheeley, Carpenter-Anderson, Ozhogin, Denton), characteristic frequencies (cyclotron, plasma, lower-hybrid, upper-hybrid), particle orbital parameters (loss cone, bounce period, drift period, Larmor radius), and phase-space conversion utilities.
+  </Card>
+  <Card title="WaveProperties_mod" icon="wave-sine">
+    Cold and warm plasma Stix parameters, refractive index (Appleton-Hartree and full dispersion), dispersion relations (R-, L-, O-, X-mode, light wave), wave amplitude models (Bell, Li, Jasna), wave packet shapes (Gaussian, one-sided, two-sided), resonant velocity, resonance angle, and Gendrin angle.
+  </Card>
+  <Card title="WPI_mod" icon="bolt">
+    Gyro-averaged equations of motion for three wave-particle interaction scenarios: **whistler_electron_mod** (whistler waves ↔ electrons), **EMIC_ion_mod** (EMIC waves ↔ ions, oblique propagation), and **parallel_EMIC_mod** (EMIC waves ↔ ions, parallel propagation). Includes nonlinearity parameters C0, C1m, C1p, S, H, and the phase angle η.
+  </Card>
+  <Card title="LandauDamp_mod" icon="chart-line-down">
+    Spatial damping rate along a whistler ray path using a hot-plasma imaginary dispersion relation. Supports five electron distribution models (bi-Maxwellian, Bell, Bortnik, Golden, Golden2) and integrates with external ray-tracing output files. Also provides a cavity enhancement factor utility.
+  </Card>
+</CardGroup>
+
+## Repository Structure
+
+The WPIT repository is organized into five top-level directories:
+
+| Directory | Purpose |
+|---|---|
+| `WPIT/` | Python source code — modules and sub-modules |
+| `Module_descriptions/` | Jupyter Notebooks with theoretical derivations and example calls for each module |
+| `WPIT_tests/` | Reproduction of published literature results; serve as verification and tutorials |
+| `WPIT_results/` | Notebooks for the simulations presented in the WPIT paper |
+| `Documentation/` | HTML API documentation generated from source docstrings |
+
+## Use Cases
+
+- **Test-particle radiation-belt simulations** — integrate the equations of motion for electrons interacting with chorus or EMIC waves under realistic magnetospheric conditions.
+- **Wave propagation studies** — compute refractive indices, wave normal angles, and dispersion curves as a function of L-shell, latitude, and plasma density model.
+- **Landau damping analysis** — ingest ray-tracing output and compute wave power decay along the ray path for different hot-electron distributions.
+- **Library integration** — import individual routines (e.g., `Bmag_dipole`, `refr_index_appleton`) into an external numerical simulation without pulling in the full toolset.
+
+## Citation and License
+
+WPIT is distributed under the **Creative Commons Attribution License (CC BY)**. If you use WPIT in your research, please cite:
+
+> Tourgaidis, S., & Sarris, T. *Wave-Particle Interactions Toolset (WPIT): a Python-based toolset to model wave-particle interactions in the magnetosphere.* Frontiers in Astronomy and Space Sciences, 295.
+
+The software is provided "as is", without warranty of any kind.
+
+<Note>
+WPIT has been tested on Ubuntu 18.04 LTS with Python 3.6.9. See the [Installation](/installation) page for the full list of pinned package versions.
+</Note>

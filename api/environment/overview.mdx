@@ -1,0 +1,122 @@
+---
+title: "Environment_mod: Magnetospheric Environment Module"
+sidebarTitle: "Overview"
+description: "WPIT Environment_mod overview: functions by category, physical constants, and import patterns for magnetospheric wave-particle interaction modelling."
+---
+
+The `Environment_mod` module is the foundational building block of WPIT (Wave-Particle Interactions Toolset). It provides a self-contained collection of functions and physical constants for characterising Earth's inner magnetosphere: computing dipole magnetic field geometry, empirical plasma density profiles, characteristic plasma frequencies, and key particle dynamic quantities such as bounce period, drift period, Larmor radius, and loss cone angles.
+
+Every function in this module operates on standard SI or CGS units as noted in the individual reference pages. The module is designed to be used standalone for environment characterisation, or in conjunction with WPIT's wave and diffusion modules for full wave-particle interaction simulations.
+
+## Import Pattern
+
+```python
+import WPIT.Environment_mod as env
+```
+
+Once imported, all exported functions and the `const` sub-module are accessible via the `env` namespace:
+
+```python
+import WPIT.Environment_mod as env
+
+# Magnetic field at L=4, equator
+B = env.Bmag_dipole(4.0, 0.0)
+
+# Electron gyrofrequency
+wce = env.omega_cyclotron(B, env.const.qe, env.const.me)
+```
+
+## Physical Constants
+
+Physical constants are available through the `env.const` sub-module. All values are in SI units unless otherwise noted.
+
+| Constant | Symbol | Value | Description |
+|---|---|---|---|
+| `env.const.Re` | $R_E$ | `6 378 137 m` | Earth mean radius |
+| `env.const.c_light` | $c$ | `2.997 956 × 10⁸ m/s` | Speed of light |
+| `env.const.me` | $m_e$ | `9.109 × 10⁻³¹ kg` | Electron mass |
+| `env.const.qe` | $q_e$ | `1.602 × 10⁻¹⁹ C` | Elementary charge (electron) |
+| `env.const.qi` | $q_i$ | `1.602 × 10⁻¹⁹ C` | Elementary charge (ion) |
+| `env.const.mO` | $m_O$ | `2.676 × 10⁻²⁶ kg` | Oxygen ion mass |
+| `env.const.mH` | $m_H$ | `1.673 × 10⁻²⁷ kg` | Hydrogen ion mass |
+| `env.const.mHe` | $m_{He}$ | `6.690 × 10⁻²⁷ kg` | Helium ion mass |
+| `env.const.epsilon0` | $\varepsilon_0$ | `8.854 × 10⁻¹² F/m` | Permittivity of free space |
+| `env.const.eps0` | $\varepsilon_0$ | `8.854 × 10⁻¹² F/m` | Alias for `epsilon0` |
+| `env.const.ms` | — | `[me, mH, mHe, mO]` | Vector of species masses |
+| `env.const.qs` | — | `[qe, qi, qi, qi]` | Vector of species charges |
+| `env.const.kb` | $k_B$ | `1.381 × 10⁻²³ J/K` | Boltzmann constant |
+| `env.const.mu0` | $\mu_0$ | `1.257 × 10⁻⁶ H/m` | Permeability of free space |
+
+```python
+import WPIT.Environment_mod as env
+
+# Access individual constants
+print(env.const.Re)       # 6378137 m
+print(env.const.me)       # 9.10938291e-31 kg
+print(env.const.qe)       # 1.602176565e-19 C
+
+# Species mass and charge vectors (e⁻, H⁺, He⁺, O⁺)
+print(env.const.ms)       # [me, mH, mHe, mO]
+print(env.const.qs)       # [qe, qi, qi, qi]
+```
+
+## Module Reference
+
+<CardGroup cols={2}>
+  <Card title="Magnetic Field" icon="magnet" href="/api/environment/magnetic-field">
+    Dipole field strength, field-line gradient, and L-shell geometry functions: `Bmag_dipole`, `dB_ds`, `Lshell`.
+  </Card>
+  <Card title="Plasma Densities" icon="wave-square" href="/api/environment/plasma-densities">
+    Empirical electron density models for the equatorial plane and along field lines: Sheeley, Carpenter-Anderson, Denton, and Ozhogin models.
+  </Card>
+  <Card title="Frequencies" icon="chart-line" href="/api/environment/frequencies">
+    Characteristic plasma wave frequencies: cyclotron, plasma, lower hybrid, upper hybrid resonances, and their spatial gradients.
+  </Card>
+  <Card title="Particle Parameters" icon="atom" href="/api/environment/particle-parameters">
+    Particle dynamic quantities: loss cone, bounce and drift periods, Larmor radius, adiabatic invariant, pitch angle transforms, and Debye length.
+  </Card>
+</CardGroup>
+
+## All Exported Functions
+
+### Magnetic Field
+
+| Function | Description |
+|---|---|
+| `Bmag_dipole(L_arg, lamda_arg)` | Geomagnetic dipole field strength in Tesla |
+| `dB_ds(B_arg, lamda_arg, L_arg)` | Gradient of B along the field line in T/m |
+| `Lshell(r_arg, lat_arg)` | L-shell from geocentric distance and latitude |
+
+### Plasma Densities
+
+| Function | Description |
+|---|---|
+| `density_equ_sheeley(L_arg)` | Equatorial electron density — Sheeley (2001) model |
+| `density_equ_carpenter_anderson(Lsh, Kpmax, day, mlt, Rb)` | Equatorial electron density — Carpenter & Anderson (1992) model |
+| `density_FL_denton(ne0_arg, lamda_arg)` | Field-line electron density — Denton (2002) model |
+| `density_ozhogin(L_arg, lambda_arg)` | Field-line electron density — Ozhogin (2012) model |
+
+### Frequencies
+
+| Function | Description |
+|---|---|
+| `omega_cyclotron(B_arg, q_arg, m_arg)` | Particle gyrofrequency in rad/s |
+| `omega_plasma(n_arg, q_arg, m_arg)` | Plasma frequency in rad/s |
+| `omega_lhr(wce_arg, wpe_arg, wci_arg, wpi_arg)` | Lower hybrid resonance frequency in rad/s |
+| `omega_uhr(wce_arg, wpe_arg)` | Upper hybrid resonance frequency in rad/s |
+| `dwc_ds(wc_arg, lamda_arg, L_arg)` | Gradient of gyrofrequency along the field line |
+
+### Particle Parameters
+
+| Function | Description |
+|---|---|
+| `loss_cone(L_arg)` | Loss cone angle at the equator in radians |
+| `loss_cone_v2(L_arg, h_arg)` | Loss cone angle for a specified mirror altitude |
+| `T_bounce(L_arg, v_arg, aeq_arg)` | Particle bounce period in seconds |
+| `T_drift(B_arg, m_arg, v_arg, L_arg, aeq_arg)` | Particle drift period in seconds |
+| `R_Larmor(uperp_arg, gamma_arg, B_arg, ms_arg, qs_arg)` | Larmor (gyro) radius in metres |
+| `mu_adiabatic(pper_arg, B_arg, m_arg)` | First adiabatic invariant |
+| `initial_velocity(Ekev, alpha, m_arg)` | Velocity components from kinetic energy and pitch angle |
+| `aeq2alpha(L_arg, lambda_arg, aeq_arg)` | Equatorial pitch angle → local pitch angle |
+| `alpha2aeq(L_arg, lambda_arg, alpha_arg)` | Local pitch angle → equatorial pitch angle |
+| `debye_length(ne_arg, Te_arg)` | Debye shielding length in metres |

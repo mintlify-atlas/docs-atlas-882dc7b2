@@ -1,0 +1,320 @@
+---
+title: "RayUtils_mod: Ray File I/O, Appending, and Plotting"
+sidebarTitle: "Ray Utilities"
+description: "API reference for WPIT's RayUtils_mod: read and append ray files, compute resonant energies along ray paths, visualise Landau damping, and derive wave-power enhancement histograms."
+---
+
+The `RayUtils_mod` sub-module provides six functions that handle the full lifecycle of a ray-tracing dataset in WPIT: parsing the raw ray file into a DataFrame, merging the computed Landau damping results with a rich set of derived plasma and geometric quantities, reading those enriched files back for downstream analysis, and producing several standard diagnostic plots. All functions work with file paths as strings; the appended and raw-input DataFrames are constructed with `pandas` and are fully interoperable with standard scientific Python workflows.
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import (
+    read_input_ray,
+    append_ray,
+    read_appended_ray,
+    resonance_along_raypath,
+    enhancement_factor,
+    ray_plots,
+)
+```
+
+---
+
+## `read_input_ray`
+
+Reads a whitespace-delimited ray file into a pandas DataFrame with 37 standardised columns. The file format is the output of the WPIT-compatible ray-tracing code: each row is one time step along the ray, and columns follow a fixed ordering.
+
+```python
+df = read_input_ray(ray_file_name)
+```
+
+<ParamField body="ray_file_name" type="str">
+  Path to the input `.ray` file. The file must be whitespace-delimited with no header row.
+</ParamField>
+
+<ResponseField name="df" type="pandas.DataFrame">
+  DataFrame with one row per ray step and the following columns:
+
+  | Column | Description |
+  |---|---|
+  | `ray` | Ray index |
+  | `ray_stop` | Ray-stop flag |
+  | `time` | Propagation time (s) |
+  | `posx`, `posy`, `posz` | Position vector (m), Solar Magnetic frame |
+  | `vprelx`, `vprely`, `vprelz` | Phase velocity components (m s⁻¹) |
+  | `vgrelx`, `vgrely`, `vgrelz` | Group velocity components (m s⁻¹) |
+  | `nx`, `ny`, `nz` | Refractive index vector (dimensionless) |
+  | `Bx`, `By`, `Bz` | Background magnetic field (T) |
+  | `w` | Wave angular frequency (rad s⁻¹) |
+  | `Nspec` | Number of plasma species |
+  | `qs1`–`qs4` | Species charges (C) |
+  | `ms1`–`ms4` | Species masses (kg) |
+  | `Ns1`–`Ns4` | Species number densities (m⁻³) |
+  | `nus1`–`nus4` | Species collision frequencies (s⁻¹) |
+  | `freq` | Wave frequency in Hz, derived as `w / (2*pi)` |
+</ResponseField>
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import read_input_ray
+
+df = read_input_ray("my_ray.ray")
+print(df.columns.tolist())
+print(f"Steps: {len(df)}, duration: {df.time.iloc[-1]:.3f} s")
+```
+
+---
+
+## `append_ray`
+
+Reads the raw ray file and the corresponding `<ray_file_name>_damping.csv` produced by `landau_damping`, then computes a comprehensive set of derived quantities at each time step and saves the result as `<ray_file_name>_appended.csv`. The raw ray data is truncated to steps where the normalised wave power remains above 1% (0.01).
+
+```python
+append_ray(ray_file_name)
+```
+
+<ParamField body="ray_file_name" type="str">
+  Path to the original `.ray` file. The function automatically looks for `ray_file_name + '_damping.csv'` in the same location.
+</ParamField>
+
+<ResponseField name="(side-effect)" type="file">
+  Writes `<ray_file_name>_appended.csv`. The file contains all time steps where `damp > 0.01` and includes the following columns beyond those in the raw ray:
+
+  | Column | Description |
+  |---|---|
+  | `psi` | Wave normal angle relative to **B₀** (degrees) |
+  | `theta_res` | Resonance cone angle (degrees) |
+  | `gendrin` | Gendrin angle (degrees) |
+  | `Y` | Angular distance from resonance cone: \|psi - theta_res\| |
+  | `L` | Magnetic L-shell (computed via SpacePy MAG spherical coordinates) |
+  | `alt` | Altitude in Earth radii |
+  | `lat`, `lon` | Magnetic latitude and longitude (degrees) |
+  | `damp` | Normalised wave power (0 to 1) |
+  | `S_stix`, `D_stix`, `P_stix`, `R_stix`, `L_stix` | Stix cold-plasma parameters |
+  | `wce`, `wcH`, `wcHe`, `wcO` | Cyclotron frequencies for e, H+, He+, O+ (rad s⁻¹) |
+  | `wpe`, `wpH`, `wpHe`, `wpO` | Plasma frequencies for e, H+, He+, O+ (rad s⁻¹) |
+  | `wlhr` | Lower hybrid resonance frequency (rad s⁻¹) |
+  | `wuhr` | Upper hybrid resonance frequency (rad s⁻¹) |
+  | `Ne`, `NH`, `NHe`, `NO` | Species densities renamed from `Ns1`–`Ns4` |
+</ResponseField>
+
+<Note>
+  `append_ray` requires the `spacepy` library for coordinate conversion (SM Cartesian → MAG spherical). If SpacePy is not installed, the function will raise an `ImportError` at import time.
+</Note>
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import append_ray
+
+append_ray("my_ray.ray")
+# → writes my_ray.ray_appended.csv
+```
+
+---
+
+## `read_appended_ray`
+
+Reads an appended ray CSV file (produced by `append_ray`) back into a pandas DataFrame. This is a thin wrapper around `pd.read_csv`.
+
+```python
+df = read_appended_ray(ray_file_name)
+```
+
+<ParamField body="ray_file_name" type="str">
+  Path to the `_appended.csv` file. Pass the full path including the `_appended.csv` suffix.
+</ParamField>
+
+<ResponseField name="df" type="pandas.DataFrame">
+  DataFrame with all columns written by `append_ray` (see above). Column types are inferred by pandas.
+</ResponseField>
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import read_appended_ray
+
+df = read_appended_ray("my_ray.ray_appended.csv")
+print(df[['time', 'psi', 'L', 'damp']].head(10))
+```
+
+---
+
+## `resonance_along_raypath`
+
+Computes the resonant velocity and energy of particles interacting with the wave at each point along the ray for a grid of equatorial pitch angles. At each spatial step the resonant parallel and perpendicular velocities are determined from the resonance condition via `WPIT.WaveProperties_mod.resonant_velocity`, and the kinetic energy is converted to keV.
+
+```python
+time, psi, Ekev_res, upar_res, uper_res, gamma_res = resonance_along_raypath(
+    ray_file_name, mres, alpha_array
+)
+```
+
+<ParamField body="ray_file_name" type="str">
+  Path to the `_appended.csv` file.
+</ParamField>
+
+<ParamField body="mres" type="int">
+  Resonance harmonic order m. Use `0` for Landau resonance, `1` for the fundamental cyclotron resonance, `-1` for the first counter-propagating resonance, etc.
+</ParamField>
+
+<ParamField body="alpha_array" type="array-like of float">
+  Array of equatorial pitch angles in degrees for which to compute resonant parameters. The function loops over all combinations of pitch angle and ray step.
+</ParamField>
+
+<ResponseField name="time" type="pandas.Series">
+  Propagation time array from the appended ray (seconds).
+</ResponseField>
+
+<ResponseField name="psi" type="pandas.Series">
+  Wave normal angle array along the ray (degrees).
+</ResponseField>
+
+<ResponseField name="Ekev_res" type="numpy.ndarray shape (len(alpha_array), len(time))">
+  Resonant kinetic energy in keV. Row index corresponds to pitch-angle index; column index to ray-step index.
+</ResponseField>
+
+<ResponseField name="upar_res" type="numpy.ndarray shape (len(alpha_array), len(time))">
+  Resonant parallel velocity in m s⁻¹ (Fortran order for memory efficiency).
+</ResponseField>
+
+<ResponseField name="uper_res" type="numpy.ndarray shape (len(alpha_array), len(time))">
+  Resonant perpendicular velocity in m s⁻¹.
+</ResponseField>
+
+<ResponseField name="gamma_res" type="numpy.ndarray shape (len(alpha_array), len(time))">
+  Lorentz factor at resonance (dimensionless).
+</ResponseField>
+
+```python
+import numpy as np
+from WPIT.LandauDamp_mod.RayUtils_mod import resonance_along_raypath
+
+alpha_array = np.linspace(10, 80, 20)   # degrees
+time, psi, Ekev, upar, uper, gam = resonance_along_raypath(
+    "my_ray.ray_appended.csv",
+    mres=0,
+    alpha_array=alpha_array,
+)
+
+import matplotlib.pyplot as plt
+plt.pcolormesh(time, alpha_array, Ekev, shading='auto')
+plt.colorbar(label='Resonant energy [keV]')
+plt.xlabel('Time [s]')
+plt.ylabel('Equatorial pitch angle [deg]')
+plt.title('Landau resonant energy along ray')
+plt.show()
+```
+
+---
+
+## `enhancement_factor`
+
+Computes and plots a wave-power enhancement histogram as a function of L-shell by collecting ray equatorial crossings (latitude sign changes) and weighting each crossing by the local normalised wave power. This reveals which L-shells receive the most cumulative wave energy as the ray bounces.
+
+```python
+enhancement_factor(ray_file_name)
+```
+
+<ParamField body="ray_file_name" type="str">
+  Path to the `_appended.csv` file produced by `append_ray`.
+</ParamField>
+
+<ResponseField name="(side-effect)" type="plot">
+  Displays a matplotlib histogram with `L-shell` on the x-axis and `Cavity enhancement` (weighted density) on the y-axis. Bins are 0.1 L-units wide, centred on the mean L-shell of the equatorial crossings.
+</ResponseField>
+
+**Algorithm summary:**
+1. Interpolate `lat`, `L`, and `damp` onto a fine time grid (0.1 ms resolution via `numpy.interp`).
+2. Detect zero-crossings of the interpolated latitude (equatorial crossings).
+3. Collect L-shell and wave-power values at each crossing.
+4. Plot `plt.hist` with `weights=mag_new` and `density=True`.
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import enhancement_factor
+
+enhancement_factor("my_ray.ray_appended.csv")
+```
+
+---
+
+## `ray_plots`
+
+Generates a comprehensive suite of diagnostic plots from the appended ray file. This is the recommended first step after `append_ray` to inspect the ray trajectory and damping results.
+
+```python
+ray_plots(ray_file_name)
+```
+
+<ParamField body="ray_file_name" type="str">
+  Path to the `_appended.csv` file produced by `append_ray`.
+</ParamField>
+
+<ResponseField name="(side-effect)" type="plots">
+  Produces the following matplotlib figures sequentially:
+
+  | Figure | Description |
+  |---|---|
+  | Wave freq + lat vs time | Wave frequency and lower-hybrid frequency vs time (left axis), magnetic latitude vs time (right axis). |
+  | Normalised wave power | Wave power (0–1) vs propagation time; shows where Landau damping is significant. |
+  | L-shell vs time | Ray L-shell trajectory. |
+  | Latitude vs time | Ray magnetic latitude. |
+  | Wave normal angle vs time | psi (degrees) vs time. |
+  | Refractive index vs time | Magnitude of the refractive index vector vs time. |
+  | L-shell + latitude (combined) | Dual-axis overlay of L-shell and latitude vs time. |
+  | Wave normal angle + latitude | Dual-axis overlay of psi and latitude vs time. |
+  | Ray path 3-panel (XY, XZ, YZ) | Ray path in MAG Cartesian coordinates (in Earth radii), with dipole field lines and refractive-index quiver arrows, colour-coded by wave power. |
+  | 2×2 summary | Ray path (XZ) scatter coloured by damping, wave power vs time, L-shell+latitude, and enhancement histogram. |
+  | Single ray path with damping | Large single-panel ray-path scatter in XZ plane, colour-coded by Landau damping. |
+</ResponseField>
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import ray_plots
+
+ray_plots("my_ray.ray_appended.csv")
+```
+
+---
+
+## Complete pipeline example
+
+The following end-to-end example shows all six `RayUtils_mod` functions being used in sequence alongside `landau_damping`.
+
+```python
+import numpy as np
+import WPIT.LandauDamp_mod as ld
+from WPIT.LandauDamp_mod.RayUtils_mod import (
+    read_input_ray,
+    append_ray,
+    read_appended_ray,
+    resonance_along_raypath,
+    enhancement_factor,
+    ray_plots,
+)
+
+ray_file = "examples/chorus_ray.ray"
+
+# --- Stage 1: inspect the raw ray ---
+df_raw = read_input_ray(ray_file)
+print(f"Ray has {len(df_raw)} steps, max time = {df_raw.time.max():.2f} s")
+print(f"Wave frequency: {df_raw.freq.iloc[0]:.1f} Hz")
+
+# --- Stage 2: compute Landau damping ---
+ld.landau_damping(ray_file, distr='Bell')
+# Output: chorus_ray.ray_damping.csv
+
+# --- Stage 3: append derived quantities ---
+append_ray(ray_file)
+# Output: chorus_ray.ray_appended.csv
+
+# --- Stage 4: load and inspect appended data ---
+df = read_appended_ray(ray_file + "_appended.csv")
+print(df[['time', 'L', 'psi', 'damp']].describe())
+
+# --- Stage 5: resonant energy grid ---
+alpha_array = np.arange(10, 85, 5)   # pitch angles in degrees
+time, psi, Ekev, upar, uper, gam = resonance_along_raypath(
+    ray_file + "_appended.csv",
+    mres=0,
+    alpha_array=alpha_array
+)
+print(f"Landau resonant energies: {Ekev.min():.1f} – {Ekev.max():.1f} keV")
+
+# --- Stage 6: enhancement factor and ray plots ---
+enhancement_factor(ray_file + "_appended.csv")
+ray_plots(ray_file + "_appended.csv")
+```

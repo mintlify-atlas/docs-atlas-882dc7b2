@@ -1,0 +1,87 @@
+---
+title: "WaveProperties_mod Overview: WPIT Wave Physics API"
+sidebarTitle: "Overview"
+description: "WPIT WaveProperties_mod: Stix parameters, dispersion relations, refractive indices, wave amplitudes, and resonance tools for magnetospheric wave modelling."
+---
+
+The `WaveProperties_mod` module is the core wave-physics engine of WPIT. It provides functions for computing cold and warm plasma Stix parameters, dielectric tensors, dispersion relations for all principal wave modes (R, L, O, X, and light), refractive indices via the Appleton-Hartree formula and full Stix formalism, wave field amplitudes following Bell (1984), Li et al. (2015), and Jasna et al. (1992) normalisation conventions, parametric wave-packet envelopes, and resonant-velocity / resonance-angle calculations for wave–particle interaction modelling in Earth's inner magnetosphere.
+
+## Import pattern
+
+```python
+import WPIT.WaveProperties_mod as wave
+```
+
+All public names are re-exported from the package `__init__.py`, so every function below is accessible directly on the `wave` namespace.
+
+---
+
+## Function catalogue
+
+### Stix parameters & dielectric tensors
+
+| Function | Description |
+|---|---|
+| `wave.stix_parameters` | Cold-plasma Stix S, D, P, R, L from densities and B₀ |
+| `wave.stix_parameters_warm` | Warm-plasma corrections to Stix S, D, P, R, L |
+| `wave.cold_dielectric_tensor` | Full 3×3 cold dielectric tensor components |
+| `wave.warm_dielectric_tensor` | Full 3×3 warm dielectric tensor components per species |
+
+### Dispersion relations
+
+| Function | Description |
+|---|---|
+| `wave.dispersion_R` | R-mode (right-hand circularly polarised, parallel) |
+| `wave.dispersion_L` | L-mode (left-hand circularly polarised, parallel) |
+| `wave.dispersion_O` | O-mode (ordinary mode) |
+| `wave.dispersion_X` | X-mode (extra-ordinary mode) |
+| `wave.dispersion_light` | Free-space light-wave dispersion |
+| `wave.cutoff_L` | L-mode cutoff frequency |
+| `wave.cutoff_R` | R-mode cutoff frequency |
+
+### Refractive index
+
+| Function | Description |
+|---|---|
+| `wave.refr_index_appleton` | Appleton-Hartree two-root refractive index |
+| `wave.refr_index_full` | Full cold-plasma refractive index (Stix formalism) |
+| `wave.refr_index_warm` | Warm-plasma refractive index |
+| `wave.refr_index_parallel_EMIC` | Parallel-propagating EMIC refractive index |
+
+### Wave amplitudes & packets
+
+| Function | Description |
+|---|---|
+| `wave.wave_amplitudes_bell` | Bell (1984) wave-field components from Bᵧ |
+| `wave.wave_amplitudes_li` | Li et al. (2015) wave-field components from \|B_w\| |
+| `wave.wave_amplitudes_jasna` | Jasna et al. (1992) wave-field components from Poynting flux |
+| `wave.wave_packet_gauss` | Gaussian latitude envelope |
+| `wave.wave_packet_one_sided` | One-sided tanh envelope |
+| `wave.wave_packet_two_sided` | Two-sided tanh envelope |
+
+### Resonance
+
+| Function | Description |
+|---|---|
+| `wave.resonant_velocity` | Relativistic parallel resonant velocity and energy |
+| `wave.res_angle` | Resonance cone angle from Stix S and P |
+| `wave.gendrin_angle` | Gendrin angle for maximum group-velocity projection |
+
+---
+
+## Sub-pages
+
+<CardGroup cols={2}>
+  <Card title="Dispersion" icon="wave-sine" href="/api/wave-properties/dispersion">
+    Stix parameters, dielectric tensors, dispersion relations, and cutoff frequencies for all principal wave modes.
+  </Card>
+  <Card title="Refractive Index" icon="arrows-left-right" href="/api/wave-properties/refractive-index">
+    Appleton-Hartree, full cold-plasma, warm-plasma, and parallel EMIC refractive-index functions.
+  </Card>
+  <Card title="Wave Amplitudes" icon="signal" href="/api/wave-properties/wave-amplitudes">
+    Bell, Li, and Jasna wave-field component functions plus Gaussian and tanh wave-packet envelope models.
+  </Card>
+  <Card title="Resonance" icon="circle-nodes" href="/api/wave-properties/resonance">
+    Relativistic resonant velocity, resonance cone angle, and Gendrin angle calculations.
+  </Card>
+</CardGroup>

@@ -1,0 +1,397 @@
+---
+title: "Refractive Index Functions for Magnetospheric Plasma Waves"
+sidebarTitle: "Refractive Index"
+description: "API reference for Appleton-Hartree, full cold-plasma, warm-plasma, and parallel EMIC refractive-index functions in WPIT's WaveProperties_mod module."
+---
+
+The refractive-index functions in `WaveProperties_mod` convert plasma parameters and wave geometry into the electromagnetic phase and group velocities needed for ray tracing and wave–particle interaction calculations. Four approaches are available: the classic two-fluid Appleton-Hartree formula; the complete cold-plasma Stix formalism via `refr_index_full`; a warm-plasma cubic-root solver in `refr_index_warm`; and a parallel-propagation specialisation for EMIC waves in `refr_index_parallel_EMIC`. All functions return the refractive index η together with the full and component wave numbers κ, κ‖, and κ⊥.
+
+```python
+import WPIT.WaveProperties_mod as wave
+```
+
+---
+
+## `refr_index_appleton`
+
+Implements the Appleton-Hartree dispersion formula for a two-component (electron + background ions) magnetised plasma. Returns both roots (plus and minus) of the quadratic dispersion equation; physically the two roots correspond to the ordinary (O) and extra-ordinary (X) modes for transverse propagation, or to the R and L modes for parallel propagation.
+
+**Reference:** Appleton, E. V. (1932). Wireless studies of the ionosphere. *Proceedings of the Wireless Section of the IEE* 7, 257–265.
+
+```python
+eta_sq_plus, eta_sq_minus, ref_ind, kappa, kappa_par, kappa_per = \
+    wave.refr_index_appleton(w_arg, wpe_arg, wce_arg, theta_arg)
+```
+
+### Parameters
+
+<ParamField path="w_arg" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpe_arg" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wce_arg" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="theta_arg" type="float" required>
+  Wave normal angle θ with respect to the background magnetic field **B₀** [rad].
+  `0` corresponds to parallel propagation; `π/2` to perpendicular propagation.
+</ParamField>
+
+### Returns
+
+<ResponseField name="eta_sq_plus" type="float">
+  The **plus** root of the Appleton-Hartree equation, η²₊. At θ = 0 this corresponds
+  to the R-mode (right-hand circularly polarised).
+</ResponseField>
+
+<ResponseField name="eta_sq_minus" type="float">
+  The **minus** root, η²₋. At θ = 0 this corresponds to the L-mode (left-hand circularly
+  polarised). At θ = π/2 the two roots map to the O and X modes.
+</ResponseField>
+
+<ResponseField name="ref_ind" type="float">
+  Refractive index η = √η²₊ if η²₊ > 0, else √η²₋ (dimensionless). Selects the first
+  positive-definite root.
+</ResponseField>
+
+<ResponseField name="kappa" type="float">
+  Total wave number κ = η ω / c [m⁻¹].
+</ResponseField>
+
+<ResponseField name="kappa_par" type="float">
+  Field-aligned (parallel) wave number κ‖ = κ cos θ [m⁻¹].
+</ResponseField>
+
+<ResponseField name="kappa_per" type="float">
+  Perpendicular wave number κ⊥ = κ sin θ [m⁻¹].
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w     = 2 * np.pi * 5e3        # 5 kHz whistler
+wpe   = 2 * np.pi * 1.0e5
+wce   = 2 * np.pi * 1.4e6
+theta = np.deg2rad(20)          # 20° wave normal angle
+
+eta_p, eta_m, eta, kappa, kpar, kperp = \
+    wave.refr_index_appleton(w, wpe, wce, theta)
+
+print(f"eta^2+ = {eta_p:.2f},  eta^2- = {eta_m:.2f}")
+print(f"eta = {eta:.4f},  kappa = {kappa:.4e} m^-1")
+print(f"k_par = {kpar:.4e} m^-1,  k_perp = {kperp:.4e} m^-1")
+```
+
+<Note>
+  The Appleton-Hartree formula assumes a single electron species against a stationary
+  ion background and neglects ion dynamics entirely. For frequencies near or below the
+  ion cyclotron frequency, use `refr_index_full` (multi-species Stix) or
+  `refr_index_parallel_EMIC` instead.
+</Note>
+
+---
+
+## `refr_index_full`
+
+Computes the refractive index from the full cold-plasma Stix dispersion relation using precomputed S, P, R, and L parameters. This formulation correctly accounts for all four species (e⁻, H⁺, He⁺, O⁺) and is valid across the entire frequency range from DC to above the electron plasma frequency. The quadratic coefficients A, B, C in η⁴ involve the wave normal angle θ explicitly.
+
+**Reference:** Kimura, I. (1966). Effects of ions on whistler-mode ray tracing. *Radio Science* 1, 269–283.
+
+```python
+eta_sq_plus, eta_sq_minus, ref_ind, kappa, kappa_par, kappa_per = \
+    wave.refr_index_full(theta_arg, w_wave_arg, S_arg, P_arg, R_arg, L_arg)
+```
+
+### Parameters
+
+<ParamField path="theta_arg" type="float" required>
+  Wave normal angle θ with respect to **B₀** [rad].
+</ParamField>
+
+<ParamField path="w_wave_arg" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="S_arg" type="float" required>
+  Stix S parameter (from `stix_parameters` or `stix_parameters_warm`).
+</ParamField>
+
+<ParamField path="P_arg" type="float" required>
+  Stix P parameter.
+</ParamField>
+
+<ParamField path="R_arg" type="float" required>
+  Stix R parameter.
+</ParamField>
+
+<ParamField path="L_arg" type="float" required>
+  Stix L parameter.
+</ParamField>
+
+### Returns
+
+<ResponseField name="eta_sq_plus" type="float">
+  Larger root η²₊ = (B + F) / (2A) of the Stix biquadratic, where
+  F = √(B² − 4AC) and A, B, C are angle-dependent coefficients built from S, P, R, L.
+</ResponseField>
+
+<ResponseField name="eta_sq_minus" type="float">
+  Smaller root η²₋ = (B − F) / (2A). For whistler-mode waves this is typically the
+  physical root (slow mode); the larger root corresponds to the fast/light branch.
+</ResponseField>
+
+<ResponseField name="ref_ind" type="float">
+  Refractive index η = √η²₋ (always uses the minus root). Dimensionless.
+</ResponseField>
+
+<ResponseField name="kappa" type="float">
+  Total wave number κ [m⁻¹].
+</ResponseField>
+
+<ResponseField name="kappa_par" type="float">
+  Field-aligned wave number κ‖ = κ cos θ [m⁻¹].
+</ResponseField>
+
+<ResponseField name="kappa_per" type="float">
+  Perpendicular wave number κ⊥ = κ sin θ [m⁻¹].
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w     = 2 * np.pi * 5e3
+Ne    = 1e7
+B0    = 3e-5
+
+S, D, P, R, L = wave.stix_parameters(w, Ne, 0.9e7, 0.05e7, 0.05e7, B0)
+
+theta = np.deg2rad(30)
+eta_p, eta_m, eta, kappa, kpar, kperp = \
+    wave.refr_index_full(theta, w, S, P, R, L)
+
+print(f"Full cold-plasma: eta = {eta:.4f},  kappa_par = {kpar:.4e} m^-1")
+```
+
+<Note>
+  The minus root is hardcoded in `refr_index_full` to select the whistler/slow branch.
+  If you need the fast branch (η²₊), extract it directly from the `eta_sq_plus` return value.
+</Note>
+
+---
+
+## `refr_index_warm`
+
+Solves the warm-plasma dispersion relation — a cubic polynomial in η² — for the physical (positive, real) root. Warm corrections introduce finite-temperature effects via the dimensionless thermal ratio τₛ = (k_B Tₛ) / (mₛ c²) × η² for each species. The cubic is assembled from cold tensor components K₁₁⁰, K₂₂⁰, K₃₃⁰, K₁₂⁰ and the warm correction arrays returned by `warm_dielectric_tensor`.
+
+**Reference:** Kulkarni, P., Gołkowski, M., Inan, U., and Bell, T. (2015). *JGR: Space Physics* 120, 581–591.
+
+```python
+ref_ind, kappa, kappa_par, kappa_per = wave.refr_index_warm(
+    K_e, K_H, K_He, K_O, psi_arg, Te, Ti, K110, K220, K330, K120, w_wave_arg
+)
+```
+
+### Parameters
+
+<ParamField path="K_e" type="list[complex]" required>
+  9-element list of electron warm dielectric tensor components
+  (from `warm_dielectric_tensor`).
+</ParamField>
+
+<ParamField path="K_H" type="list[complex]" required>
+  9-element list of H⁺ warm dielectric tensor components.
+</ParamField>
+
+<ParamField path="K_He" type="list[complex]" required>
+  9-element list of He⁺ warm dielectric tensor components.
+</ParamField>
+
+<ParamField path="K_O" type="list[complex]" required>
+  9-element list of O⁺ warm dielectric tensor components.
+</ParamField>
+
+<ParamField path="psi_arg" type="float" required>
+  Wave normal angle ψ with respect to **B₀** [rad].
+</ParamField>
+
+<ParamField path="Te" type="float" required>
+  Electron temperature [eV].
+</ParamField>
+
+<ParamField path="Ti" type="float" required>
+  Ion temperature [eV] (applied uniformly to all ion species).
+</ParamField>
+
+<ParamField path="K110" type="complex" required>
+  K₁₁ component of the **cold** dielectric tensor (from `cold_dielectric_tensor`).
+</ParamField>
+
+<ParamField path="K220" type="complex" required>
+  K₂₂ component of the cold dielectric tensor. Equal to K₁₁ for a cold plasma.
+</ParamField>
+
+<ParamField path="K330" type="complex" required>
+  K₃₃ component of the cold dielectric tensor.
+</ParamField>
+
+<ParamField path="K120" type="complex" required>
+  K₁₂ component of the cold dielectric tensor (purely imaginary).
+</ParamField>
+
+<ParamField path="w_wave_arg" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+### Returns
+
+<ResponseField name="ref_ind" type="float">
+  Warm-plasma refractive index η (real part of the positive root) (dimensionless).
+</ResponseField>
+
+<ResponseField name="kappa" type="float">
+  Total wave number κ = η ω / c [m⁻¹].
+</ResponseField>
+
+<ResponseField name="kappa_par" type="float">
+  Field-aligned wave number κ‖ = κ cos ψ [m⁻¹].
+</ResponseField>
+
+<ResponseField name="kappa_per" type="float">
+  Perpendicular wave number κ⊥ = κ sin ψ [m⁻¹].
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w     = 2 * np.pi * 5e3
+psi   = np.deg2rad(20)
+Te, Ti = 1.0, 0.5               # eV
+
+# Compute cold tensor first
+K11, K12, K13, K21, K22, K23, K31, K32, K33 = wave.cold_dielectric_tensor(
+    w, wce, wpe, wcH, wpH, wcHe, wpHe, wcO, wpO
+)
+# Compute warm tensor corrections
+K_e, K_H, K_He, K_O = wave.warm_dielectric_tensor(
+    w, wce, wpe, wcH, wpH, wcHe, wpHe, wcO, wpO, psi
+)
+
+eta_w, kappa_w, kpar_w, kperp_w = wave.refr_index_warm(
+    K_e, K_H, K_He, K_O, psi, Te, Ti, K11, K22, K33, K12, w
+)
+print(f"Warm eta = {eta_w:.4f}")
+```
+
+<Note>
+  The solver uses `numpy.roots` on the cubic and returns the first positive-real root.
+  In strongly anisotropic conditions near a resonance there may be multiple positive
+  roots; inspect `eta_sq_plus` / `eta_sq_minus` from `refr_index_full` to verify
+  the physical branch.
+</Note>
+
+---
+
+## `refr_index_parallel_EMIC`
+
+Computes the squared refractive index for **parallel-propagating** electromagnetic ion cyclotron (EMIC) waves in a multi-species cold plasma. The function evaluates the L-mode dispersion relation relevant for EMIC wave propagation studies, where the wave is left-hand polarised at the frequency of the ions.
+
+**Reference:** Summers, D. and Thorne, R. M. (2003). Relativistic electron pitch-angle scattering by electromagnetic ion cyclotron waves during geomagnetic storms. *JGR: Space Physics* 108.
+
+```python
+eta_sq = wave.refr_index_parallel_EMIC(
+    wmega_wave, wpe, wce, wpH, wcH, wpO, wcO, wpHe, wcHe
+)
+```
+
+### Parameters
+
+<ParamField path="wmega_wave" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpe" type="float" required>
+  Electron plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wce" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpH" type="float" required>
+  H⁺ plasma angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wcH" type="float" required>
+  H⁺ cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wpO" type="float" required>
+  O⁺ plasma angular frequency [rad s⁻¹]. Pass `0` to exclude O⁺.
+</ParamField>
+
+<ParamField path="wcO" type="float" required>
+  O⁺ cyclotron angular frequency [rad s⁻¹]. Pass `0` to exclude O⁺.
+</ParamField>
+
+<ParamField path="wpHe" type="float" required>
+  He⁺ plasma angular frequency [rad s⁻¹]. Pass `0` to exclude He⁺.
+</ParamField>
+
+<ParamField path="wcHe" type="float" required>
+  He⁺ cyclotron angular frequency [rad s⁻¹]. Pass `0` to exclude He⁺.
+</ParamField>
+
+### Returns
+
+<ResponseField name="R_tmp" type="float">
+  Squared refractive index η² for the parallel L-mode EMIC wave (dimensionless).
+  The function returns η² directly (not η). A positive value indicates propagation;
+  negative values indicate evanescence between the L-cutoff and the ion cyclotron frequency.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+# Parameters for H+ EMIC wave below H+ cyclotron frequency
+B0  = 4e-8                          # 40 nT
+wcH = 1.609e-19 * B0 / 1.673e-27   # H+ cyclotron frequency
+wcHe = wcH / 4.0
+wcO  = wcH / 16.0
+wce  = 1.609e-19 * B0 / 9.109e-31  # electron cyclotron frequency
+
+Ne   = 1e6                          # m^-3
+eps0 = 8.854e-12
+wpe  = np.sqrt(Ne * (1.609e-19)**2 / (9.109e-31 * eps0))
+wpH  = wpe / np.sqrt(1836.0)
+
+w_emic = 0.8 * wcH                  # 80% of H+ cyclotron freq
+
+eta_sq = wave.refr_index_parallel_EMIC(
+    w_emic, wpe, wce, wpH, wcH, 0, 0, 0, 0
+)
+print(f"EMIC parallel eta^2 = {eta_sq:.2f}")
+```
+
+<Note>
+  This function returns η² (not η). The EMIC L-mode branch becomes evanescent when
+  the wave frequency approaches `wcH`, `wcHe`, or `wcO` from below — the denominator
+  factors `(ω − ωcH)` etc. change sign, making η² negative. Guard against this with
+  a frequency range check before calling the function.
+</Note>

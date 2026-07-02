@@ -1,0 +1,255 @@
+---
+title: "Resonance Velocity, Cone Angle & Gendrin Angle — WPIT"
+sidebarTitle: "Resonance"
+description: "Relativistic resonant velocity, resonance cone angle, and Gendrin angle in WPIT WaveProperties_mod for magnetospheric wave–particle interaction studies."
+---
+
+The resonance functions in `WaveProperties_mod` characterise the geometric and kinematic conditions under which energetic charged particles interact resonantly with electromagnetic waves in the magnetosphere. `resonant_velocity` solves the relativistic resonance condition for the parallel velocity and energy of a particle interacting with a wave at harmonic number m; `res_angle` finds the wave normal angle at which the refractive index surface has a conical singularity (resonance cone); and `gendrin_angle` identifies the wave normal angle that maximises the field-aligned component of the group velocity — a key quantity for chorus-wave duct tracing and Landau-damping studies.
+
+```python
+import WPIT.WaveProperties_mod as wave
+```
+
+---
+
+## `resonant_velocity`
+
+Computes the relativistic cyclotron-resonance parallel velocity, perpendicular velocity, total velocity, resonant kinetic energy, and Lorentz factor for a particle interacting with an electromagnetic wave at resonance harmonic number m. The resonance condition is:
+
+> ω − k‖ v‖ − m ω_c / γ = 0
+
+Solving this relativistically for v‖ yields the quadratic formula implemented in the source code.
+
+**Reference:** Sousa, A. P. (2018). *Global and Seasonal Effects of Lightning-Induced Electron Precipitation*. Stanford University (PhD thesis).
+
+```python
+v_para, v_perp, v_tot, E_res, gamma = wave.resonant_velocity(
+    m_res_arg, w_wave_arg, kz_arg, wce_arg, alpha_arg, m_arg
+)
+```
+
+### Parameters
+
+<ParamField path="m_res_arg" type="int" required>
+  Resonance harmonic number m. Use `m = 0` for Landau (transit-time) resonance,
+  `m = 1` for the fundamental cyclotron resonance, `m = −1` for the anomalous cyclotron
+  resonance, and |m| > 1 for higher harmonics.
+</ParamField>
+
+<ParamField path="w_wave_arg" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="kz_arg" type="float" required>
+  z-component of the wave number (field-aligned component) κ‖ [m⁻¹]. Obtain from
+  `refr_index_full`, `refr_index_appleton`, or `refr_index_warm` as `kappa_par`.
+</ParamField>
+
+<ParamField path="wce_arg" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹]. For ion resonances, pass the
+  appropriate ion cyclotron frequency.
+</ParamField>
+
+<ParamField path="alpha_arg" type="float" required>
+  Local particle pitch angle α [rad]. The pitch angle defines the ratio
+  v⊥ / v = sin α and is used to project the total resonant velocity onto
+  the field-aligned and perpendicular directions.
+</ParamField>
+
+<ParamField path="m_arg" type="float" required>
+  Rest mass of the resonant particle [kg]. Use `WPIT.Environment_mod.const.me`
+  for electrons or the appropriate ion mass constant.
+</ParamField>
+
+### Returns
+
+<ResponseField name="v_para_res" type="float">
+  Parallel (field-aligned) resonant velocity v‖ [m s⁻¹].
+  For Landau resonance (m = 0) the sign is set to oppose the wave phase velocity direction.
+</ResponseField>
+
+<ResponseField name="v_per_res" type="float">
+  Perpendicular resonant velocity v⊥ = v_tot × sin α [m s⁻¹].
+</ResponseField>
+
+<ResponseField name="v_tot_res" type="float">
+  Total resonant velocity v = v‖ / cos α [m s⁻¹].
+</ResponseField>
+
+<ResponseField name="E_res" type="float">
+  Resonant kinetic energy E = (γ − 1) m c² [J] (in CGS ergs as noted in the docstring;
+  the code uses SI: J = kg m² s⁻²).
+</ResponseField>
+
+<ResponseField name="gamma_res" type="float">
+  Relativistic Lorentz factor γ = 1 / √(1 − v²/c²) (dimensionless). γ = 1 for a
+  non-relativistic particle; γ > 1 for a relativistic particle.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+from WPIT.Environment_mod import const
+import numpy as np
+
+# 5 kHz whistler, 20° wave normal angle
+w      = 2 * np.pi * 5e3
+B0     = 3e-5
+S, D, P, R, L = wave.stix_parameters(w, 1e7, 0.9e7, 0.05e7, 0.05e7, B0)
+theta  = np.deg2rad(20)
+_, _, eta, kappa, kpar, kperp = wave.refr_index_full(theta, w, S, P, R, L)
+
+wce    = const.qe * B0 / const.me
+alpha  = np.deg2rad(60)            # 60° pitch angle
+
+# Fundamental cyclotron resonance (m = 1)
+v_par, v_perp, v_tot, E_res, gamma = wave.resonant_velocity(
+    1, w, kpar, wce, alpha, const.me
+)
+
+E_keV = E_res / (1e3 * const.qe)   # convert J -> keV
+print(f"v_para = {v_par/const.c_light:.4f} c")
+print(f"Resonant energy = {E_keV:.2f} keV,  gamma = {gamma:.4f}")
+```
+
+```python
+# Landau resonance (m = 0)
+v_par0, v_perp0, v_tot0, E_res0, gamma0 = wave.resonant_velocity(
+    0, w, kpar, wce, alpha, const.me
+)
+print(f"Landau v_para = {v_par0/const.c_light:.4f} c")
+```
+
+<Note>
+  For `m_res_arg = 0` (Landau resonance) the function sets direction to `−sign(k‖)` so
+  that the resonant particle moves in the same direction as the wave. For m ≠ 0 the
+  direction is `sign(k‖) × sign(m)`, correctly distinguishing co- and counter-streaming
+  resonances. Ensure `kz_arg` carries the correct sign (positive = northward propagation).
+</Note>
+
+---
+
+## `res_angle`
+
+Computes the resonance cone angle θ_res — the wave normal angle at which the refractive index surface of a cold plasma diverges (η² → ∞). At θ_res the wave cannot propagate: energy is deposited at the plasma resonance. For whistler-mode waves, the resonance cone limits the obliqueness of propagation paths.
+
+**Reference:** Stix, T. H. (1992). *Waves in Plasmas*. Springer Science & Business Media.
+
+```python
+theta_res = wave.res_angle(P_arg, S_arg)
+```
+
+### Parameters
+
+<ParamField path="P_arg" type="float" required>
+  Stix P parameter (from `stix_parameters`). P encodes the field-parallel dielectric
+  response and equals `1 − Σ ωₚₛ²/ω²`.
+</ParamField>
+
+<ParamField path="S_arg" type="float" required>
+  Stix S parameter. S = (R + L)/2 encodes the average transverse response.
+</ParamField>
+
+### Returns
+
+<ResponseField name="thetares" type="float">
+  Resonance cone half-angle [rad]. Defined by `tan²(θ_res) = −P / S`.
+  Valid only when P/S < 0 (i.e., one of P or S is negative), which is the condition
+  for the existence of a resonance cone in the cold-plasma model.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w  = 2 * np.pi * 5e3
+S, D, P, R, L = wave.stix_parameters(w, 1e7, 0.9e7, 0.05e7, 0.05e7, 3e-5)
+
+theta_res = wave.res_angle(P, S)
+print(f"Resonance cone angle = {np.rad2deg(theta_res):.2f} degrees")
+```
+
+<Note>
+  The expression `tan²(θ_res) = −P/S` requires `−P/S > 0`, i.e., P and S must have
+  opposite signs. At frequencies below the lower hybrid resonance and below ωce, P < 0
+  and S > 0 for whistler-mode waves, so the resonance cone is well-defined. If P/S ≥ 0
+  the function will raise a `ValueError` from `np.sqrt` of a negative number; check the
+  sign of P and S before calling.
+</Note>
+
+---
+
+## `gendrin_angle`
+
+Computes the Gendrin angle θ_G — the wave normal angle at which the group velocity vector is directed exactly along the background magnetic field **B₀**. At this angle the wave energy propagates purely field-aligned regardless of the wave normal direction, making it a natural duct for chorus wave generation and propagation. The Gendrin angle exists only in the frequency band ω_lhr < ω < ω_ce/2.
+
+**Reference:** Bortnik, J., Inan, U. S., and Bell, T. F. (2006). Landau damping and resultant unidirectional propagation of chorus waves. *Geophysical Research Letters* 33.
+
+```python
+theta_gendrin = wave.gendrin_angle(w_wave_arg, wlhr_arg, wce_arg)
+```
+
+### Parameters
+
+<ParamField path="w_wave_arg" type="float" required>
+  Wave angular frequency [rad s⁻¹].
+</ParamField>
+
+<ParamField path="wlhr_arg" type="float" required>
+  Lower hybrid resonance angular frequency ω_lhr [rad s⁻¹].
+  Approximately `sqrt(ωce × ωcH)` for an electron–proton plasma.
+</ParamField>
+
+<ParamField path="wce_arg" type="float" required>
+  Electron cyclotron angular frequency [rad s⁻¹].
+</ParamField>
+
+### Returns
+
+<ResponseField name="th_gen" type="float">
+  Gendrin angle [rad]. The exact formula is:
+
+  `θ_G = arccos(2(ω² − ω_lhr²) / (ω ω_ce))`
+
+  Outside the valid frequency range the function returns:
+  - `np.nan` if ω < ω_lhr (wave below lower hybrid; no Gendrin angle exists)
+  - `π/2` (90°) if ω = ω_lhr (Gendrin angle exactly 90° at the lower hybrid frequency)
+  - `0` if ω_ce/2 < ω < ω_ce (above half the cyclotron frequency; θ_G = 0°)
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+B0  = 3e-5
+wce = 1.609e-19 * B0 / 9.109e-31      # electron cyclotron frequency
+wcH = wce / 1836.0                     # H+ cyclotron
+wlh = np.sqrt(wce * wcH)              # lower hybrid resonance
+
+# Sweep frequency from wlh to wce/2
+freqs = np.linspace(wlh * 1.01, 0.49 * wce, 300)
+
+gendrin_angles_deg = np.array([
+    np.rad2deg(wave.gendrin_angle(w, wlh, wce))
+    for w in freqs
+])
+
+import matplotlib.pyplot as plt
+plt.plot(freqs / wce, gendrin_angles_deg)
+plt.xlabel("ω / ωce")
+plt.ylabel("Gendrin angle (°)")
+plt.title("Gendrin angle vs normalised wave frequency")
+plt.show()
+```
+
+<Note>
+  The Gendrin angle is a key parameter in chorus-wave formation models. Below the lower
+  hybrid frequency, EMIC waves do not have a Gendrin angle and this function returns
+  `np.nan`. Code that iterates over a frequency array should guard against `np.nan`
+  values before plotting or using the result in further calculations.
+</Note>

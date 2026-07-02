@@ -1,0 +1,255 @@
+---
+title: "Working with Ray-Tracing Output Files in WPIT"
+sidebarTitle: "Ray Tracing"
+description: "How to read, append, and analyse ray-tracing .ray files using WPIT's RayUtils_mod: resonance conditions, Landau damping, and wave amplitude enhancement factors."
+---
+
+WPIT's `LandauDamp_mod.RayUtils_mod` sub-module provides a complete pipeline for post-processing ray-tracing output produced by external ray-tracing codes. Starting from a whitespace-delimited `.ray` file, you can compute Landau damping along the ray path, enrich the file with derived quantities such as the Stix parameters, wave normal angles, and L-shell coordinates, then evaluate resonance conditions and wave-amplitude enhancement factors for any pitch-angle population. This page covers the file format, each utility function, and representative code examples.
+
+## The `.ray` file format
+
+A `.ray` file is a plain-text, whitespace-delimited table where each row represents one time step along the ray path. There is no header line — column positions are fixed as follows:
+
+| Column(s) | Name | Description |
+|---|---|---|
+| 1 | `ray` | Ray index |
+| 2 | `ray_stop` | Stop flag (0 = propagating) |
+| 3 | `time` | Propagation time (s) |
+| 4–6 | `posx`, `posy`, `posz` | Position vector in SM Cartesian (m) |
+| 7–9 | `vprelx`, `vprely`, `vprelz` | Phase velocity (relative to c) |
+| 10–12 | `vgrelx`, `vgrely`, `vgrelz` | Group velocity (relative to c) |
+| 13–15 | `nx`, `ny`, `nz` | Refractive index vector |
+| 16–18 | `Bx`, `By`, `Bz` | Geomagnetic field vector (T) |
+| 19 | `w` | Angular wave frequency (rad/s) |
+| 20 | `Nspec` | Number of plasma species |
+| 21–24 | `qs1`–`qs4` | Species charges (C) |
+| 25–28 | `ms1`–`ms4` | Species masses (kg) |
+| 29–32 | `Ns1`–`Ns4` | Species number densities (m⁻³) |
+| 33–36 | `nus1`–`nus4` | Collision frequencies (rad/s) |
+
+An example file is included in the WPIT repository at:
+
+```
+Module_descriptions/example_rays/WPIT2_freq2000_psi0.0_L5_lamda_0_mode1.ray
+```
+
+<Note>
+The species order is by convention: electrons (`qs1`, `ms1`, `Ns1`), H⁺ (`qs2`, `ms2`, `Ns2`), He⁺ (`qs3`, `ms3`, `Ns3`), O⁺ (`qs4`, `ms4`, `Ns4`). Unused species should be set to zero density.
+</Note>
+
+## RayUtils_mod function reference
+
+<CardGroup cols={2}>
+  <Card title="read_input_ray" icon="file-import">
+    Reads a raw `.ray` file into a pandas DataFrame with named columns.
+  </Card>
+  <Card title="append_ray" icon="file-plus">
+    Enriches a `.ray` file with computed plasma parameters and saves `_appended.csv`.
+  </Card>
+  <Card title="resonance_along_raypath" icon="circle-nodes">
+    Computes the resonant energy as a function of time along the appended ray.
+  </Card>
+  <Card title="enhancement_factor" icon="chart-bar">
+    Calculates the equatorial cavity enhancement factor weighted by damping amplitude.
+  </Card>
+</CardGroup>
+
+## `read_input_ray`
+
+`read_input_ray(ray_file_name)` reads a raw `.ray` file and returns a pandas `DataFrame` with all 36 columns named according to the convention above, plus a derived `freq` column (Hz).
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import read_input_ray
+
+ray_file = "Module_descriptions/example_rays/WPIT2_freq2000_psi0.0_L5_lamda_0_mode1.ray"
+df = read_input_ray(ray_file)
+
+print(df.columns.tolist())
+# ['ray', 'ray_stop', 'time', 'posx', 'posy', 'posz',
+#  'vprelx', 'vprely', 'vprelz', 'vgrelx', 'vgrely', 'vgrelz',
+#  'nx', 'ny', 'nz', 'Bx', 'By', 'Bz', 'w', 'Nspec',
+#  'qs1', 'qs2', 'qs3', 'qs4', 'ms1', 'ms2', 'ms3', 'ms4',
+#  'Ns1', 'Ns2', 'Ns3', 'Ns4', 'nus1', 'nus2', 'nus3', 'nus4', 'freq']
+
+# Quick inspection
+print(f"Steps: {len(df)},  freq: {df.freq[0]:.1f} Hz")
+print(df[['time', 'posx', 'posy', 'posz', 'Ns1']].head())
+```
+
+The returned DataFrame gives direct access to position, field, and density along the ray at each time step without any manual parsing.
+
+## Landau damping and `append_ray`
+
+Before calling `append_ray`, you must first compute the Landau damping along the ray and save the result as `<ray_file>_damping.csv`. The `LandauDamp_mod.landau_damping` function does this:
+
+```python
+from WPIT.LandauDamp_mod.landau_damping import landau_damping
+
+# Available distributions: 'Bell', 'Bortnik', 'Bimaxw', 'Golden'
+landau_damping(ray_file, distr='Bell')
+# Saves: ray_file + '_damping.csv'
+# Plots normalised wave power vs. time
+```
+
+Once the damping CSV exists alongside the `.ray` file, `append_ray(ray_file_name)` merges both, computes the full set of plasma and wave quantities at each step, and writes `<ray_file>_appended.csv`.
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import append_ray
+
+append_ray(ray_file)
+# Saves: ray_file + '_appended.csv'
+```
+
+The appended file contains all original columns plus:
+
+| Added column | Description |
+|---|---|
+| `psi` | Wave normal angle ψ relative to B (deg) |
+| `theta_res` | Resonance cone angle θ_res (deg) |
+| `gendrin` | Gendrin angle (deg) |
+| `Y` | Distance from resonance cone \|ψ − θ_res\| (deg) |
+| `L`, `alt`, `lat`, `lon` | L-shell, altitude, latitude, longitude (MAG) |
+| `damp` | Normalised wave power (0–1) |
+| `S_stix` … `L_stix` | Cold-plasma Stix parameters S, D, P, R, L |
+| `wce`, `wcH`, `wcHe`, `wcO` | Cyclotron frequencies (rad/s) |
+| `wpe`, `wpH`, `wpHe`, `wpO` | Plasma frequencies (rad/s) |
+| `wlhr`, `wuhr` | Lower/upper hybrid resonance frequencies (rad/s) |
+
+## `read_appended_ray`
+
+After `append_ray` has been called you can reload the enriched file using `read_appended_ray`:
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import read_appended_ray
+
+df_app = read_appended_ray(ray_file + "_appended.csv")
+
+import matplotlib.pyplot as plt
+plt.plot(df_app.time, df_app.damp)
+plt.xlabel("Time (s)")
+plt.ylabel("Normalised wave power")
+plt.title("Landau damping along ray path")
+plt.show()
+```
+
+## `resonance_along_raypath`
+
+`resonance_along_raypath(ray_file_name, mres, alpha_array)` computes, for every pitch angle in `alpha_array` and every time step in the appended ray, the resonant parallel velocity, perpendicular velocity, total speed, Lorentz factor, and resonant kinetic energy.
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import resonance_along_raypath
+import numpy as np
+
+appended_file = ray_file + "_appended.csv"
+mres         = -1                            # cyclotron resonance order
+alpha_array  = np.deg2rad([30, 45, 60, 75, 90])  # pitch angles in rad
+
+time, psi, Ekev_res, upar_res, uper_res, gamma_res = \
+    resonance_along_raypath(appended_file, mres, alpha_array)
+
+# Ekev_res has shape (len(alpha_array), len(time))
+plt.figure()
+for k, alpha_deg in enumerate([30, 45, 60, 75, 90]):
+    plt.plot(time, Ekev_res[k, :], label=f"α = {alpha_deg}°")
+plt.xlabel("Time (s)")
+plt.ylabel("Resonant energy (keV)")
+plt.legend()
+plt.show()
+```
+
+**Return values:**
+
+| Name | Shape | Description |
+|---|---|---|
+| `time` | (N,) | Propagation time steps (s) |
+| `psi` | (N,) | Wave normal angle along ray (deg) |
+| `Ekev_res` | (K, N) | Resonant kinetic energy (keV) |
+| `upar_res` | (K, N) | Resonant parallel velocity (m/s) |
+| `uper_res` | (K, N) | Resonant perpendicular velocity (m/s) |
+| `gamma_res` | (K, N) | Resonant Lorentz factor |
+
+where K = `len(alpha_array)` and N = number of time steps.
+
+## `enhancement_factor`
+
+`enhancement_factor(ray_file_name)` computes the wave-amplitude cavity enhancement factor by tracking each equatorial crossing of the ray and weighting the L-shell distribution by the normalised wave power at that crossing. It produces a histogram of the enhancement factor as a function of L-shell.
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import enhancement_factor
+
+# Requires the appended CSV produced by append_ray()
+enhancement_factor(ray_file + "_appended.csv")
+# Displays a histogram: L-shell vs. cavity enhancement
+```
+
+<Tip>
+The enhancement factor integrates over all equatorial crossings detected in the ray trajectory. Rays that are heavily damped before completing a half-bounce will contribute less to the histogram, giving a physically motivated amplitude estimate for trapped-wave resonance studies.
+</Tip>
+
+## `ray_plots`
+
+`ray_plots(ray_file_name)` is a convenience function that reads the appended CSV and produces a standard set of diagnostic figures: wave power decay, L-shell and latitude vs. time, wave normal angle, refractive index, and a 2-D ray path plot in the XY, XZ, and YZ planes with dipole field lines overlaid.
+
+```python
+from WPIT.LandauDamp_mod.RayUtils_mod import ray_plots
+
+ray_plots(ray_file + "_appended.csv")
+```
+
+The function produces the following panels:
+
+- Wave frequency (ω) and lower hybrid resonance frequency (ω_LHR) vs. time, with ray latitude on the right axis
+- Normalised wave power (Landau damping) vs. time
+- L-shell vs. time
+- Magnetic latitude vs. time
+- Wave normal angle ψ vs. time
+- Refractive index vs. time
+- XY, XZ, YZ ray path plots with dipole field lines and wave-normal-angle arrows
+- Combined L-shell + latitude panel
+- Ray path colour-coded by Landau damping magnitude
+
+<Accordion title="Complete end-to-end pipeline example">
+
+```python
+import numpy as np
+from WPIT.LandauDamp_mod.landau_damping import landau_damping
+from WPIT.LandauDamp_mod.RayUtils_mod import (
+    read_input_ray,
+    append_ray,
+    read_appended_ray,
+    resonance_along_raypath,
+    enhancement_factor,
+    ray_plots,
+)
+
+ray_file = (
+    "Module_descriptions/example_rays/"
+    "WPIT2_freq2000_psi0.0_L5_lamda_0_mode1.ray"
+)
+
+# Step 1 — inspect the raw ray
+df_raw = read_input_ray(ray_file)
+print(f"Ray has {len(df_raw)} time steps, f = {df_raw.freq[0]:.1f} Hz")
+
+# Step 2 — compute Landau damping (saves *_damping.csv)
+landau_damping(ray_file, distr='Bell')
+
+# Step 3 — enrich ray file (saves *_appended.csv)
+append_ray(ray_file)
+
+# Step 4 — resonance conditions for a range of pitch angles
+alpha_array = np.deg2rad(np.arange(10, 90, 10))
+appended    = ray_file + "_appended.csv"
+time, psi, Ekev_res, *_ = resonance_along_raypath(appended, -1, alpha_array)
+
+# Step 5 — cavity enhancement histogram
+enhancement_factor(appended)
+
+# Step 6 — full diagnostic plot suite
+ray_plots(appended)
+```
+</Accordion>
+
+<Warning>
+`append_ray` depends on `spacepy` for coordinate conversion (SM → MAG). Ensure that SpacePy's data files have been initialised (`python -c "import spacepy.toolbox; spacepy.toolbox.update()"`) before running the pipeline.
+</Warning>

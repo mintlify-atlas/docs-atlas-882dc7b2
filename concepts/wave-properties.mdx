@@ -1,0 +1,193 @@
+---
+title: "WaveProperties_mod: Cold and Warm Plasma Wave Theory"
+sidebarTitle: "Wave Properties"
+description: "WaveProperties_mod: Stix parameters, Appleton-Hartree refractive index, R/L/O/X dispersion, wave amplitude models, and resonance and Gendrin angles."
+---
+
+`WaveProperties_mod` translates the background environment (field strength, densities, frequencies) into the wave fields and wave numbers that drive particle dynamics. It implements both cold plasma theory and warm plasma corrections, and covers everything from the fundamental Stix parameters to the polarization components of the wave electric and magnetic fields.
+
+```python
+import WPIT.WaveProperties_mod as wave
+```
+
+## Cold Plasma Theory: Stix Parameters
+
+The Stix representation of the cold magnetoplasma dielectric tensor (Stix, 1992) expresses plasma wave properties through five scalar parameters: **R**, **L**, **P**, **S** (= (R+L)/2), and **D** (= (R−L)/2).
+
+### `wave.stix_parameters(w, Ne, NH, NHe, NO, B0)`
+
+Computes all five Stix parameters for a multi-species plasma (electrons + H⁺ + He⁺ + O⁺) at wave frequency `w` and background field `B0`:
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+import WPIT.WaveProperties_mod as wave
+
+L     = 5.0
+B     = env.Bmag_dipole(L, 0.0)
+ne_eq, _, _ = env.density_equ_sheeley(L)
+Ne = ne_eq * 1e6    # cm⁻³ → m⁻³
+
+w  = 2 * np.pi * 2000.0   # 2 kHz in rad/s
+
+S, D, P, R, L_stix = wave.stix_parameters(
+    w_arg=w,
+    Ne_arg=Ne,
+    NH_arg=0.0,    # no H+ in this example
+    NHe_arg=0.0,
+    NO_arg=0.0,
+    B0mag_arg=B
+)
+print(f"R={R:.4f}  L={L_stix:.4f}  P={P:.4f}  S={S:.4f}  D={D:.4f}")
+```
+
+**Inputs:** wave frequency `w` (rad/s), number densities for each species (m⁻³), background field `B0mag` (T)  
+**Outputs:** `Sstix`, `Dstix`, `Pstix`, `Rstix`, `Lstix` (dimensionless)
+
+Internally the function computes plasma and cyclotron frequencies for each ion species using `env.const`.
+
+### `wave.stix_parameters_warm(w, Ne, NH, NHe, NO, B0, T_par, T_per)`
+
+Warm-plasma corrected Stix parameters accounting for finite temperature anisotropy. Returns the same five parameters but with thermal corrections included in the off-diagonal dielectric tensor components.
+
+### `wave.cold_dielectric_tensor(S, D, P)`
+
+Assembles the 3×3 cold-plasma dielectric tensor from the Stix parameters:
+
+```
+K = [ S   -iD   0 ]
+    [ iD    S   0 ]
+    [ 0     0   P ]
+```
+
+### `wave.warm_dielectric_tensor(S_warm, D_warm, P_warm)`
+
+Assembles the warm-plasma dielectric tensor using the corrected Stix parameters.
+
+## Refractive Index
+
+### `wave.refr_index_appleton(w, wpe, wce, theta)`
+
+Appleton-Hartree formula for an electron-only cold plasma (Appleton, 1932). Fast and widely used for whistler-mode calculations where ion contributions can be neglected:
+
+```python
+wce = env.omega_cyclotron(B, env.const.qe, env.const.me)
+wpe = env.omega_plasma(Ne, env.const.qe, env.const.me)
+theta = np.deg2rad(30.0)    # wave normal angle
+
+musq_plus, musq_minus, ref_ind, kappa, kappa_par, kappa_per = \
+    wave.refr_index_appleton(w, wpe, wce, theta)
+```
+
+**Outputs:**
+- `musq_plus` — µ²₊ (plus root of the dispersion relation)
+- `musq_minus` — µ²₋ (minus root)
+- `ref_ind` — refractive index µ for the propagating (µ² > 0) root
+- `kappa` — wave number magnitude (rad/m)
+- `kappa_par` — parallel component κ‖ (rad/m)
+- `kappa_per` — perpendicular component κ⊥ (rad/m)
+
+### `wave.refr_index_full(w, S, D, P, theta)`
+
+Full cold-plasma refractive index from the Stix tensor, valid for oblique propagation and multi-species plasmas. Solves the biquadratic dispersion relation using S, D, P.
+
+### `wave.refr_index_warm(w, S_warm, D_warm, P_warm, theta)`
+
+Refractive index including warm plasma corrections.
+
+### `wave.refr_index_parallel_EMIC(w, wci, wpi)`
+
+Refractive index for EMIC waves propagating strictly parallel to the background field. This is a simplified form used in `parallel_EMIC_mod`.
+
+## Dispersion Relations
+
+WPIT provides individual dispersion relation functions for the four principal magnetoplasma modes. Each takes the Stix parameters and returns the squared refractive index µ²:
+
+| Function | Mode | Propagation |
+|---|---|---|
+| `wave.dispersion_R(w, R)` | R-mode (right-hand circularly polarized) | Parallel |
+| `wave.dispersion_L(w, L)` | L-mode (left-hand circularly polarized) | Parallel |
+| `wave.dispersion_O(w, P)` | O-mode (ordinary wave) | Perpendicular |
+| `wave.dispersion_X(w, R, L, S, P)` | X-mode (extraordinary wave) | Perpendicular |
+| `wave.dispersion_light(w)` | Light wave in vacuum | Any |
+
+Cutoff frequencies (where µ² → 0) are returned by `wave.cutoff_R(R)` and `wave.cutoff_L(L)`.
+
+## Wave Amplitude Models
+
+Given a wave normal angle and the wave magnetic field amplitude By (in Tesla), WPIT can compute all six polarization components (Bx, By, Bz, Ex, Ey, Ez) of the wave field using three different polarization models.
+
+### Bell (1984) Model — `wave.wave_amplitudes_bell(mu, P, D, S, Byw, theta)`
+
+Computes the complete field vector using the cold-plasma eigenmode structure described in Bell (1984), which is the basis of the `whistler_electron_mod` equations of motion:
+
+```python
+S, D, P, R, L_stix = wave.stix_parameters(w, Ne, 0, 0, 0, B)
+_, _, mu, _, _, _ = wave.refr_index_appleton(w, wpe, wce, theta)
+
+Byw = 65e-12   # By amplitude in Tesla (65 pT)
+
+Bxw, Byw_out, Bzw, Exw, Eyw, Ezw = \
+    wave.wave_amplitudes_bell(mu, P, D, S, Byw, theta)
+```
+
+### Li Model — `wave.wave_amplitudes_li(mu, P, D, S, Byw, theta)`
+
+Alternative polarization parameterization.
+
+### Jasna Model — `wave.wave_amplitudes_jasna(mu, P, D, S, Byw, theta)`
+
+Third parameterization, used primarily for comparison studies.
+
+## Wave Packet Shapes
+
+Wave packets in WPIT are implemented as envelope functions that modulate the wave amplitude as a function of position along the field line. Three shapes are available:
+
+| Function | Shape |
+|---|---|
+| `wave.wave_packet_gauss(s, s0, sigma)` | Symmetric Gaussian envelope |
+| `wave.wave_packet_one_sided(s, s0, sigma)` | One-sided (asymmetric) Gaussian |
+| `wave.wave_packet_two_sided(s, s0, sigma1, sigma2)` | Two-sided Gaussian with independent widths |
+
+All three take the field-line coordinate `s`, packet centre `s0`, and one or two width parameters `sigma`.
+
+<Accordion title="Why different packet shapes?">
+Chorus wave elements observed by spacecraft often show asymmetric amplitude envelopes. The one-sided and two-sided Gaussians capture rising-tone or falling-tone morphologies where the leading and trailing edges of the packet have different characteristic lengths. The symmetric Gaussian is appropriate for monochromatic test-wave studies.
+</Accordion>
+
+## Resonance
+
+### Resonant Velocity — `wave.resonant_velocity(m_res, w_wave, kz, wce, alpha, m)`
+
+Computes the parallel, perpendicular, and total resonant velocities, the resonant kinetic energy, and the resonant Lorentz factor γ for a particle with pitch angle `alpha` interacting at cyclotron harmonic `m_res`:
+
+```python
+v_par, v_per, v_tot, E_res, gamma_res = wave.resonant_velocity(
+    m_res_arg=-1,            # first harmonic cyclotron resonance
+    w_wave_arg=w,
+    kz_arg=kappa_par,
+    wce_arg=wce,
+    alpha_arg=np.deg2rad(68.0),
+    m_arg=env.const.me
+)
+print(f"Resonant energy: {E_res / env.const.qe / 1e3:.1f} keV")
+```
+
+### Resonance Angle — `wave.res_angle(w, wce, wpe, theta)`
+
+The resonance (Storey) cone angle, which sets the maximum wave normal angle for propagation of whistler-mode waves.
+
+### Gendrin Angle — `wave.gendrin_angle(w_wave, wlhr, wce)`
+
+The Gendrin angle is the wave normal angle at which the group velocity of a whistler-mode wave is parallel to the background magnetic field (Bortnik et al., 2006):
+
+```python
+theta_gen = wave.gendrin_angle(w, wlhr, wce)
+print(f"Gendrin angle: {np.rad2deg(theta_gen):.2f}°")
+```
+
+Waves propagating near the Gendrin angle travel along field lines without diverging — a condition that maximises their interaction length with bouncing particles. The function returns `nan` for frequencies below the lower hybrid resonance, 90° at the lower hybrid resonance, the Gendrin formula for `wlhr < w < wce/2`, and 0° for `wce/2 < w < wce`.
+
+<Note>
+The Gendrin angle is used internally by `LandauDamp_mod` to assess the propagation direction of the wave relative to the background field along the ray path.
+</Note>

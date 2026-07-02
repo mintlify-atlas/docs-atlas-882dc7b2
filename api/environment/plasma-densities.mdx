@@ -1,0 +1,285 @@
+---
+title: "Plasma Density Models — WPIT Environment_mod API"
+sidebarTitle: "Plasma Densities"
+description: "WPIT plasma density API: Sheeley and Carpenter-Anderson equatorial models, Denton and Ozhogin field-line electron density profiles for the magnetosphere."
+---
+
+The plasma density functions in `Environment_mod` implement four peer-reviewed empirical models for electron number density in Earth's inner magnetosphere. Two models supply equatorial densities as a function of L-shell, while two others extend a given equatorial density along the full magnetic field line as a function of magnetic latitude. Together these models allow construction of complete three-dimensional density profiles needed for wave dispersion and wave-particle interaction calculations.
+
+```python
+import WPIT.Environment_mod as env
+
+# Quick equatorial density at L = 4 using the Sheeley model
+ne_mean, ne_min, ne_max = env.density_equ_sheeley(4.0)
+print(f"Ne ≈ {ne_mean:.1f} cm⁻³  [{ne_min:.1f} – {ne_max:.1f}]")
+```
+
+---
+
+## `density_equ_sheeley`
+
+Returns the mean, minimum, and maximum equatorial electron number density at a given L-shell using the empirical Sheeley et al. (2001) model. This model is based on CRRES satellite observations and provides a simple power-law description valid across the plasmasphere and trough.
+
+The mean density is:
+
+$$
+\bar{N}_e = 1390 \left(\frac{3}{L}\right)^{4.8}\ \text{cm}^{-3}
+$$
+
+The ±1σ bounds are:
+
+$$
+N_e^{\min/\max} = \bar{N}_e \mp 440 \left(\frac{3}{L}\right)^{3.6}\ \text{cm}^{-3}
+$$
+
+**Reference:** Sheeley, B. W., Moldwin, M. B., Rassoul, H. K., and Anderson, R. R. (2001). "An empirical plasmasphere and trough density model: CRRES observations." *J. Geophys. Res.*, 106(A11), 25631–25641. doi:10.1029/2000JA000286.
+
+### Parameters
+
+<ParamField path="L_arg" type="float" required>
+  L-shell value (dimensionless). The model is empirically constrained to the CRRES observation range; typical application domain is $L \approx 2$ to $L \approx 7$.
+</ParamField>
+
+### Returns
+
+<ResponseField name="ne_mean" type="float">
+  Mean equatorial electron number density in **cm⁻³**.
+</ResponseField>
+
+<ResponseField name="ne_min" type="float">
+  Lower statistical bound of equatorial electron number density in **cm⁻³**.
+</ResponseField>
+
+<ResponseField name="ne_max" type="float">
+  Upper statistical bound of equatorial electron number density in **cm⁻³**.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+# Single L-shell evaluation
+ne_mean, ne_min, ne_max = env.density_equ_sheeley(4.0)
+print(f"L=4 → Ne = {ne_mean:.1f} cm⁻³  (range: {ne_min:.1f} – {ne_max:.1f})")
+
+# Density profile from L=2 to L=7
+L_vals = np.linspace(2, 7, 100)
+means, mins, maxs = env.density_equ_sheeley(L_vals)
+
+import matplotlib.pyplot as plt
+plt.fill_between(L_vals, mins, maxs, alpha=0.3, label="±1σ range")
+plt.plot(L_vals, means, label="Mean")
+plt.xlabel("L-shell")
+plt.ylabel("Ne (cm⁻³)")
+plt.yscale("log")
+plt.legend()
+plt.show()
+```
+
+<Note>
+  Output densities are in **cm⁻³**. Multiply by $10^6$ to convert to SI units (m⁻³) for use with `omega_plasma` and other SI-based frequency functions.
+</Note>
+
+---
+
+## `density_equ_carpenter_anderson`
+
+Calculates the equatorial electron number density according to the Carpenter & Anderson (1992) ISEE/whistler model. This is a more detailed empirical model that accounts for the plasmasphere, plasmapause transition region, and outer plasma trough, with dependencies on geomagnetic activity (Kp index), season, magnetic local time (MLT), and solar activity.
+
+The model divides the magnetosphere into three zones:
+- **Saturated plasmasphere** ($2.25 \leq L \leq L_{ppi}$): density depends on day of year and sunspot number.
+- **Plasmapause transition** ($L_{ppi} \leq L \leq L_{ppo}$): sharp density gradient whose width depends on MLT.
+- **Plasma trough** ($L_{ppo} \leq L \leq 8$): low-density outer region with MLT asymmetry.
+
+The inner plasmapause boundary is placed at $L_{ppi} = 5.6 - 0.46 K_{p,\max}$.
+
+**Reference:** Carpenter, D. L., and R. R. Anderson (1992). "An ISEE/whistler model of equatorial electron density in the magnetosphere." *J. Geophys. Res.: Space Physics*, 97(A2), 1097–1108.
+
+### Parameters
+
+<ParamField path="Lsh" type="float" required>
+  L-shell value (dimensionless). Valid domain: $2.25 \leq L \leq 8$.
+</ParamField>
+
+<ParamField path="Kpmax" type="float" required>
+  Maximum Kp geomagnetic activity index in the preceding 24 hours (dimensionless, range 0–9). Higher Kp contracts the plasmapause to lower L-shells.
+</ParamField>
+
+<ParamField path="day" type="int" required>
+  Day of year (integer, 1–365). Used to apply the seasonal modulation of plasmaspheric density.
+</ParamField>
+
+<ParamField path="mlt" type="float" required>
+  Magnetic local time in decimal hours (0–24). Controls the width of the plasmapause transition and the trough density.
+</ParamField>
+
+<ParamField path="Rb" type="float" required>
+  13-month smoothed average sunspot number (dimensionless). Represents solar cycle phase; typical range 0–200.
+</ParamField>
+
+### Returns
+
+<ResponseField name="ne_eq" type="float">
+  Equatorial electron number density in **cm⁻³**.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.Environment_mod as env
+
+# Quiet-time conditions, noon MLT, mid-year, moderate solar activity
+ne = env.density_equ_carpenter_anderson(
+    Lsh=4.0,
+    Kpmax=2.0,    # quiet geomagnetic conditions
+    day=180,      # mid-year (~June)
+    mlt=12.0,     # local noon
+    Rb=80.0       # moderate solar activity
+)
+print(f"Ne = {ne:.1f} cm⁻³")
+
+# Active conditions: plasmapause moves inward
+ne_active = env.density_equ_carpenter_anderson(
+    Lsh=4.0,
+    Kpmax=6.0,    # active conditions
+    day=180,
+    mlt=12.0,
+    Rb=80.0
+)
+print(f"Ne (active) = {ne_active:.2f} cm⁻³")
+```
+
+<Note>
+  The model is defined for $2.25 \leq L \leq 8$. Evaluating outside this range may produce unphysical results. The plasmapause outer boundary $L_{ppo}$ is determined numerically as the intersection of the plasmapause and plasma trough density profiles.
+</Note>
+
+---
+
+## `density_FL_denton`
+
+Calculates the electron number density at a point along a magnetic field line using the Denton et al. (2002) power-law model. Given an equatorial reference density, the model scales density with magnetic latitude using a $\cos^{-4}(\lambda)$ relationship derived from field-aligned magnetospheric observations.
+
+The field-line density profile is:
+
+$$
+N_e(\lambda) = N_{e,\text{eq}} \cdot \cos^{-4}(\lambda)
+$$
+
+**Reference:** Denton, R. E., Goldstein, J., and Menietti, J. D. (2002). "Field line dependence of magnetospheric electron density." *Geophys. Res. Lett.*, 29(24), 2205. doi:10.1029/2002GL015963.
+
+### Parameters
+
+<ParamField path="ne0_arg" type="float" required>
+  Equatorial electron number density in the same units as the desired output (typically **cm⁻³** when using outputs from `density_equ_sheeley` or `density_equ_carpenter_anderson`). This is the reference density at $\lambda = 0$.
+</ParamField>
+
+<ParamField path="lamda_arg" type="float" required>
+  Magnetic latitude in **radians**. The density diverges as $\lambda \to \pm 90°$; limit usage to latitudes well below the loss cone mirror latitude.
+</ParamField>
+
+### Returns
+
+<ResponseField name="n_e_tmp" type="float">
+  Electron number density at the specified latitude. Units match those of `ne0_arg`.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L = 4.0
+
+# Get equatorial density from Sheeley model (cm⁻³)
+ne_eq, _, _ = env.density_equ_sheeley(L)
+
+# Density at 30° latitude using Denton model
+lamda = np.radians(30.0)
+ne_30 = env.density_FL_denton(ne_eq, lamda)
+print(f"Ne at λ=30°: {ne_30:.2f} cm⁻³")
+
+# Full field-line profile (0° to 50°)
+latitudes = np.linspace(0, np.radians(50), 200)
+ne_profile = env.density_FL_denton(ne_eq, latitudes)
+
+import matplotlib.pyplot as plt
+plt.plot(np.degrees(latitudes), ne_profile)
+plt.xlabel("Magnetic latitude (°)")
+plt.ylabel("Ne (cm⁻³)")
+plt.title(f"Denton density profile, L = {L}")
+plt.show()
+```
+
+<Note>
+  The Denton model assumes a $\cos^{-4}\lambda$ latitude dependence, consistent with flux tube volume conservation in a dipole field under the assumption of 94% H⁺, 5.4% He⁺, and 0.6% O⁺ composition. The output units are the same as the input `ne0_arg` — no internal unit conversion is performed.
+</Note>
+
+---
+
+## `density_ozhogin`
+
+Calculates the equatorial electron density and the field-line electron density at a given magnetic latitude using the Ozhogin et al. (2012) IMAGE RPI empirical model. Unlike the Denton model, Ozhogin provides its own empirical equatorial density formula as a function of L-shell, as well as a field-line profile based on a cosine power law.
+
+The equatorial density is:
+
+$$
+\log_{10} N_{e,\text{eq}} = 4.4693 - 0.4903\, L
+$$
+
+The field-line density at latitude $\lambda$ is:
+
+$$
+N_e(\lambda) = N_{e,\text{eq}} \cdot \left[\cos\!\left(\frac{\pi}{2} \cdot \frac{\lambda}{\lambda_{\text{inv}}}\right)\right]^{-0.75}
+$$
+
+where $\lambda_{\text{inv}} = \arccos(1/\sqrt{L})$ is the invariant latitude of the field line.
+
+**Reference:** Ozhogin, P., et al. (2012). "Field-aligned distribution of the plasmaspheric electron density: An empirical model derived from the IMAGE RPI measurements." *J. Geophys. Res.: Space Physics*, 117(A6). doi:10.1029/2011JA017330.
+
+### Parameters
+
+<ParamField path="L_arg" type="float" required>
+  L-shell value (dimensionless). The model's empirical log-linear equatorial density formula is derived from IMAGE RPI observations, typically valid for $L \approx 1.5$ to $L \approx 5$.
+</ParamField>
+
+<ParamField path="lambda_arg" type="float" required>
+  Magnetic latitude in **radians** at which to evaluate the field-line density.
+</ParamField>
+
+### Returns
+
+<ResponseField name="neqtmp" type="float">
+  Equatorial electron number density in **cm⁻³**, calculated from the Ozhogin log-linear L-shell formula.
+</ResponseField>
+
+<ResponseField name="n_lamtmp" type="float">
+  Electron number density at the specified magnetic latitude in **cm⁻³**.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L = 3.5
+
+# Equatorial and off-equatorial density at λ = 25°
+ne_eq, ne_lat = env.density_ozhogin(L, np.radians(25.0))
+print(f"Equatorial Ne: {ne_eq:.2f} cm⁻³")
+print(f"Ne at λ=25°:   {ne_lat:.2f} cm⁻³")
+
+# Compare Ozhogin profile with Denton profile
+latitudes = np.linspace(0, np.radians(45), 200)
+ne_eq_oz, _ = env.density_ozhogin(L, 0.0)
+
+oz_profile = [env.density_ozhogin(L, lam)[1] for lam in latitudes]
+denton_profile = env.density_FL_denton(ne_eq_oz, latitudes)
+```
+
+<Note>
+  `density_ozhogin` returns **two values**: the equatorial density and the density at the requested latitude. Both are in **cm⁻³**. The first return value is independent of `lambda_arg` — it is purely a function of L-shell. The cosine argument can reach zero at the invariant latitude boundary; avoid evaluating at or beyond `lambda_arg = arccos(1/sqrt(L))`.
+</Note>

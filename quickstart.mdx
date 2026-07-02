@@ -1,47 +1,168 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "WPIT Quickstart: Clone, Install, and First Calculation"
+sidebarTitle: "Quickstart"
+description: "Get WPIT running in under 10 minutes: clone the repo, install dependencies, and compute a dipole field strength and refractive index from scratch."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+This guide walks you from a bare checkout to a working physics calculation in approximately ten minutes. You will clone the repository, install the required packages, import the two core modules, compute the geomagnetic dipole field at a chosen L-shell and latitude, derive the electron cyclotron and plasma frequencies, and finally calculate the whistler-mode refractive index using the Appleton-Hartree formula.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+<Note>
+WPIT has been developed and tested on **Ubuntu 18.04 LTS** with **Python 3.6.9**. The steps below should work on any modern Linux or macOS system with Python 3.6+.
+</Note>
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
 
-    ```bash
-    npm install your-package
-    ```
-  </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+### Clone the repository
 
-    ```bash
-    your-cli init
-    ```
-  </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+WPIT is not published on PyPI. All code lives in the Git repository, so the first step is to clone it locally.
 
-    ```bash
-    your-cli start
-    ```
-  </Step>
-</Steps>
+```bash
+git clone https://github.com/stourgai/WPIT.git
+cd WPIT
+```
+
+### Install the dependencies
+
+All required packages are pinned in `requirements.txt`. Install them with pip:
+
+```bash
+pip install -r requirements.txt
+```
+
+The file contains:
+
+```
+matplotlib==3.2.0
+pandas==1.1.5
+scipy==1.5.4
+spacepy==0.2.2
+numpy==1.19.5
+notebook==6.4.1
+```
+
+<Warning>
+**SpacePy** may need additional system-level dependencies (e.g. a Fortran compiler and the CDF library) before `pip` can build it. If the install fails, follow the [SpacePy installation guide](https://spacepy.github.io/install.html) for your operating system and then re-run `pip install -r requirements.txt`.
+</Warning>
+
+### Import the modules
+
+Open a Python session (or start a Jupyter Notebook with `jupyter notebook`) from inside the cloned directory. Import the `Environment_mod` and `WaveProperties_mod` namespaces:
+
+```python
+import sys
+sys.path.insert(0, '.')   # ensure WPIT root is on the path
+
+import WPIT.Environment_mod as env
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+```
+
+Both modules expose all their functions at the package level — there is no need to reach into individual submodules.
+
+### Calculate the dipole magnetic field
+
+`env.Bmag_dipole(L, lamda)` returns the scalar geomagnetic field strength at L-shell `L` and magnetic latitude `lamda` (in radians), using the standard dipole formula with B₀ = 31 200 nT at the magnetic equator on the Earth's surface.
+
+```python
+L     = 5.0                        # L-shell (dimensionless)
+lamda = np.deg2rad(20.0)           # magnetic latitude in radians
+
+B = env.Bmag_dipole(L, lamda)
+
+print(f"Dipole field at L={L}, λ={np.rad2deg(lamda):.1f}°: {B*1e9:.2f} nT")
+# Example output: Dipole field at L=5, λ=20.0°: 112.37 nT
+```
+
+### Calculate characteristic frequencies
+
+Use the field value `B` together with the physical constants available under `env.const` to compute the **electron cyclotron frequency** (ωce) and the **electron plasma frequency** (ωpe). For the plasma frequency you also need an electron number density — here we use the Sheeley equatorial density model.
+
+```python
+# Electron cyclotron frequency (rad/s)
+wce = env.omega_cyclotron(B, env.const.qe, env.const.me)
+
+# Equatorial electron density from the Sheeley model (cm^-3)
+ne_mean, ne_min, ne_max = env.density_equ_sheeley(L)
+ne_m3 = ne_mean * 1e6          # convert cm^-3 → m^-3
+
+# Electron plasma frequency (rad/s)
+wpe = env.omega_plasma(ne_m3, env.const.qe, env.const.me)
+
+print(f"ωce = {wce:.3e} rad/s")
+print(f"ωpe = {wpe:.3e} rad/s")
+print(f"fce = {wce/(2*np.pi):.0f} Hz")
+print(f"fpe = {wpe/(2*np.pi):.0f} Hz")
+```
 
 <Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
-
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+All physical constants (electron mass `me`, electron charge `qe`, Earth radius `Re`, speed of light `c_light`, etc.) are accessible through `env.const`. No need to hard-code values.
 </Tip>
+
+### Calculate the refractive index
+
+`wave.refr_index_appleton(w, wpe, wce, theta)` implements the Appleton-Hartree dispersion relation for a cold magnetized plasma. It returns both roots of the dispersion relation (µ²₊ and µ²₋), the refractive index `ref_ind` for the propagating root, and the wave number `kappa` along with its parallel and perpendicular components.
+
+```python
+f_wave  = 2000.0                      # wave frequency in Hz
+w       = 2 * np.pi * f_wave          # angular frequency in rad/s
+theta   = np.deg2rad(0.0)             # wave normal angle (parallel propagation)
+
+musq_plus, musq_minus, ref_ind, kappa, kappa_par, kappa_per = \
+    wave.refr_index_appleton(w, wpe, wce, theta)
+
+print(f"Refractive index µ = {ref_ind:.4f}")
+print(f"Wave number κ      = {kappa:.4f} rad/m")
+print(f"κ‖ = {kappa_par:.4f} rad/m,  κ⊥ = {kappa_per:.4f} rad/m")
+```
+
+</Steps>
+
+## Putting It All Together
+
+The snippet below combines all five steps into a single self-contained script you can run directly:
+
+```python
+import sys
+sys.path.insert(0, '.')
+
+import numpy as np
+import WPIT.Environment_mod as env
+import WPIT.WaveProperties_mod as wave
+
+# --- Environment parameters ---
+L     = 5.0
+lamda = np.deg2rad(20.0)
+
+B   = env.Bmag_dipole(L, lamda)
+wce = env.omega_cyclotron(B, env.const.qe, env.const.me)
+
+ne_mean, _, _ = env.density_equ_sheeley(L)
+ne_m3 = ne_mean * 1e6
+wpe = env.omega_plasma(ne_m3, env.const.qe, env.const.me)
+
+# --- Wave properties ---
+f_wave = 2000.0
+w      = 2 * np.pi * f_wave
+theta  = np.deg2rad(0.0)
+
+_, _, ref_ind, kappa, kappa_par, kappa_per = \
+    wave.refr_index_appleton(w, wpe, wce, theta)
+
+# --- Print summary ---
+print("=== WPIT Quickstart Results ===")
+print(f"  L-shell          : {L}")
+print(f"  Mag. latitude    : {np.rad2deg(lamda):.1f} deg")
+print(f"  B (dipole)       : {B*1e9:.2f} nT")
+print(f"  fce              : {wce/(2*np.pi):.0f} Hz")
+print(f"  fpe              : {wpe/(2*np.pi):.0f} Hz")
+print(f"  Wave frequency   : {f_wave:.0f} Hz")
+print(f"  Refractive index : {ref_ind:.4f}")
+print(f"  Wave number κ    : {kappa:.4f} rad/m")
+```
+
+## Next Steps
+
+- Explore the `Module_descriptions/` Jupyter Notebooks for deeper theoretical background and more example calls.
+- Read the [Concepts: Environment](/concepts/environment) page to understand all density models and frequency routines.
+- See [Concepts: Wave Properties](/concepts/wave-properties) for Stix parameters, dispersion relations, and resonance angles.
+- Run the validation notebooks in `WPIT_tests/` to compare WPIT output against published literature.

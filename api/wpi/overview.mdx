@@ -1,0 +1,85 @@
+---
+title: "WPI_mod: Wave-Particle Interaction Modules Overview"
+sidebarTitle: "Overview"
+description: "Survey of WPIT's WPI_mod package: three sub-modules covering oblique whistler–electron, oblique EMIC–ion, and parallel EMIC wave-particle interactions."
+---
+
+The `WPI_mod` package provides the equations of motion needed to trace a single charged particle through a magnetospheric wave field. Each sub-module targets a specific wave mode and particle species combination, supplying time-derivative functions that can be integrated with any standard ODE solver (e.g., `scipy.integrate.solve_ivp`). All three sub-modules share the same design pattern: a `wpi_params` helper that computes pre-requisite parameters from the instantaneous wave and particle state, followed by a family of time-derivative functions, and a set of nonlinear trapping diagnostics (`nonlinear_H`, `nonlinear_S`, `nonlinear_theta`).
+
+## Package layout
+
+```
+WPIT.WPI_mod
+├── whistler_electron_mod   # Oblique whistler–electron interactions
+├── EMIC_ion_mod            # Oblique EMIC–ion interactions
+└── parallel_EMIC_mod       # Parallel-propagating EMIC interactions
+```
+
+## Import patterns
+
+```python
+# Import an entire sub-module under a short alias
+import WPIT.WPI_mod.whistler_electron_mod as wpi
+import WPIT.WPI_mod.EMIC_ion_mod as emic
+import WPIT.WPI_mod.parallel_EMIC_mod as par_emic
+
+# Or import individual functions
+from WPIT.WPI_mod.whistler_electron_mod import wpi_params, dzdt, dppardt
+from WPIT.WPI_mod.EMIC_ion_mod import wpi_params, dkpardt, dwcdt
+from WPIT.WPI_mod.parallel_EMIC_mod import dzdt, nonlinear_H, nonlinear_S
+```
+
+## Common usage pattern
+
+A typical integration loop reads current particle state variables, calls `wpi_params` once per time-step to derive wave-coupling parameters, then evaluates each time-derivative function and passes the results to the integrator.
+
+```python
+import numpy as np
+from scipy.integrate import solve_ivp
+import WPIT.WPI_mod.whistler_electron_mod as wpi
+
+def equations_of_motion(t, y, wave_params):
+    ppar, pper, lamda, eta = y
+    Bxw, Byw, Exw, Eyw, Ezw, kz, kx, wce = wave_params
+
+    gamma, w1, w2, wtau_sq, R1, R2, beta = wpi.wpi_params(
+        1, ppar, pper, Bxw, Byw, Exw, Eyw, Ezw, kz, kx, wce
+    )
+
+    dppar = wpi.dppardt(pper, eta, wtau_sq, kz, gamma, wce, dwds)
+    dpper = wpi.dpperdt(ppar, pper, eta, w1, w2, beta, gamma, R1, R2, 1, wce, dwds)
+    dz    = wpi.dzdt(ppar, gamma, mi)
+    deta  = wpi.detadt(ppar, 1, wce, wwave, gamma, kz)
+
+    return [dppar, dpper, dz, deta]
+```
+
+<Note>
+All momentum values use SI units (kg m s⁻¹). Wave field amplitudes are in SI (T for magnetic, V m⁻¹ for electric). Angular frequencies are in rad s⁻¹. Physical constants are drawn from `WPIT.Environment_mod.const`.
+</Note>
+
+## Sub-module comparison
+
+| Feature | `whistler_electron_mod` | `EMIC_ion_mod` | `parallel_EMIC_mod` |
+|---|---|---|---|
+| Wave mode | Oblique whistler | Oblique EMIC | Parallel EMIC |
+| Species | Electrons | Ions | Ions or electrons |
+| Particle mass | `const.me` | User-supplied `mi` | User-supplied `m` |
+| Oblique geometry | ✓ (kx, kz) | ✓ (kper, kpar) | ✗ (parallel only) |
+| `dkpardt` | ✗ | ✓ | ✗ |
+| `dwcdt` | ✗ | ✓ | ✗ |
+| `wpi_params` helper | ✓ | ✓ | ✗ (not needed) |
+
+## Sub-module pages
+
+<CardGroup cols={3}>
+  <Card title="Whistler–Electron" icon="bolt" href="/api/wpi/whistler-electron">
+    Oblique whistler-mode wave interactions with electrons, including full nonlinear trapping diagnostics.
+  </Card>
+  <Card title="EMIC–Ion" icon="atom" href="/api/wpi/emic-ion">
+    Oblique EMIC wave interactions with ions; adds parallel wavenumber and cyclotron frequency evolution.
+  </Card>
+  <Card title="Parallel EMIC" icon="arrow-up" href="/api/wpi/parallel-emic">
+    Simplified parallel-propagating EMIC geometry; Bessel-function terms collapse to unity.
+  </Card>
+</CardGroup>

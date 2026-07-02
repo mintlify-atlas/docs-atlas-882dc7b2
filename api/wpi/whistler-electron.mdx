@@ -1,0 +1,871 @@
+---
+title: "whistler_electron_mod: Oblique Whistler–Electron WPI"
+sidebarTitle: "Whistler–Electron"
+description: "Full API reference for WPIT's oblique whistler–electron module: wpi_params, equations of motion, and nonlinear trapping diagnostics for electron dynamics."
+---
+
+The `whistler_electron_mod` sub-module implements the relativistic equations of motion for a single electron interacting with an obliquely propagating whistler-mode wave in a dipole magnetic field. It follows the formulation of Bortnik's thesis (equations 2.25a–h) and expresses all coupling through left- and right-hand polarised wave components. The time-derivative functions are designed to be called once per integrator step after `wpi_params` has pre-computed the resonance-order-dependent coupling terms.
+
+```python
+import WPIT.WPI_mod.whistler_electron_mod as wpi
+
+# Or import individual functions
+from WPIT.WPI_mod.whistler_electron_mod import (
+    wpi_params,
+    dzdt, dlamdadt,
+    dppardt, dpperdt,
+    dEkdt, dgammadt,
+    dalphadt, daeqdt,
+    detadt,
+    nonlinear_C0, nonlinear_C1m, nonlinear_C1p,
+    nonlinear_H, nonlinear_S, nonlinear_theta,
+)
+```
+
+---
+
+## `wpi_params`
+
+Computes derived wave–particle coupling parameters needed by all time-derivative functions. Must be called once per integration step before evaluating any `d*/dt` function.
+
+```python
+gamma, w1, w2, wtau_sq, R1, R2, beta = wpi.wpi_params(
+    m_res_arg, ppar_arg, pper_arg,
+    Bxw_arg, Byw_arg,
+    Exw_arg, Eyw_arg, Ezw_arg,
+    kz_arg, kx_arg, wce_arg
+)
+```
+
+**Parameters**
+
+<ParamField path="m_res_arg" type="int">
+  Resonance harmonic order *m*. Use `m = 1` for the fundamental cyclotron resonance, `m = 0` for Landau resonance, negative integers for higher-order harmonics.
+</ParamField>
+
+<ParamField path="ppar_arg" type="float">
+  Electron momentum component parallel to the background magnetic field **B₀**, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="pper_arg" type="float">
+  Electron momentum component perpendicular to **B₀**, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="Bxw_arg" type="float">
+  x-component of the wave magnetic field amplitude, in T.
+</ParamField>
+
+<ParamField path="Byw_arg" type="float">
+  y-component of the wave magnetic field amplitude, in T.
+</ParamField>
+
+<ParamField path="Exw_arg" type="float">
+  x-component of the wave electric field amplitude, in V m⁻¹.
+</ParamField>
+
+<ParamField path="Eyw_arg" type="float">
+  y-component of the wave electric field amplitude, in V m⁻¹.
+</ParamField>
+
+<ParamField path="Ezw_arg" type="float">
+  z-component (field-aligned) of the wave electric field amplitude, in V m⁻¹.
+</ParamField>
+
+<ParamField path="kz_arg" type="float">
+  Parallel (field-aligned) wave number component, in rad m⁻¹.
+</ParamField>
+
+<ParamField path="kx_arg" type="float">
+  Perpendicular wave number component, in rad m⁻¹.
+</ParamField>
+
+<ParamField path="wce_arg" type="float">
+  Unsigned electron gyrofrequency |Ω_e|, in rad s⁻¹.
+</ParamField>
+
+**Returns** — a 7-tuple `(gamma, w1, w2, wtau_sq, R1, R2, beta)`
+
+<ResponseField name="gamma" type="float">
+  Relativistic Lorentz factor γ = √(1 + |**p**|² / (m_e c)²).
+</ResponseField>
+
+<ResponseField name="w1" type="float">
+  Right-hand trapping frequency amplitude ω₁ = (q_e / 2m_e)(B_xw + B_yw), in rad s⁻¹.
+</ResponseField>
+
+<ResponseField name="w2" type="float">
+  Left-hand trapping frequency amplitude ω₂ = (q_e / 2m_e)(B_xw − B_yw), in rad s⁻¹.
+</ResponseField>
+
+<ResponseField name="wtau_sq" type="float">
+  Squared trapping frequency ω²_τm for harmonic m (Bortnik eq. 2.25c), in rad² s⁻².
+</ResponseField>
+
+<ResponseField name="R1" type="float">
+  Polarisation ratio R₁ = (E_xw + E_yw) / (B_xw + B_yw), units V T⁻¹ (equivalent to m s⁻¹).
+</ResponseField>
+
+<ResponseField name="R2" type="float">
+  Polarisation ratio R₂ = (E_xw − E_yw) / (B_xw − B_yw), units m s⁻¹.
+</ResponseField>
+
+<ResponseField name="beta" type="float">
+  Perpendicular gyro-phase argument β = k_x p_⊥ / (m_e γ Ω_e), dimensionless. Used as the argument of Bessel functions J_n(β).
+</ResponseField>
+
+---
+
+## `dzdt`
+
+Rate of change of the field-aligned particle position *z*.
+
+```python
+vz = wpi.dzdt(ppar_arg, gamma_arg, mi_arg)
+```
+
+<ParamField path="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor (from `wpi_params`).
+</ParamField>
+
+<ParamField path="mi_arg" type="float">
+  Particle mass, in kg. For electrons use `WPIT.Environment_mod.const.me`.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  dz/dt = p_∥ / (γ m), the field-aligned velocity component, in m s⁻¹.
+</ResponseField>
+
+---
+
+## `dlamdadt`
+
+Rate of change of magnetic latitude λ along a dipole field line.
+
+```python
+dldt = wpi.dlamdadt(ppar_arg, lamda_arg, gamma_arg, L_arg)
+```
+
+<ParamField path="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="lamda_arg" type="float">
+  Current magnetic latitude λ, in radians.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ParamField path="L_arg" type="float">
+  McIlwain L-shell parameter (dimensionless Earth radii).
+</ParamField>
+
+<ResponseField name="return" type="float">
+  dλ/dt in rad s⁻¹. The electron mass `const.me` and Earth radius `const.Re` are used internally.
+</ResponseField>
+
+---
+
+## `dppardt`
+
+Rate of change of the parallel momentum component.
+
+```python
+dppar = wpi.dppardt(pper_arg, eta_arg, wtau_sq_arg, kz_arg, gamma_arg, wce_arg, dwds_arg)
+```
+
+<ParamField path="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="eta_arg" type="float">
+  Wave–particle resonance phase angle η, in radians.
+</ParamField>
+
+<ParamField path="wtau_sq_arg" type="float">
+  Squared trapping frequency ω²_τm (from `wpi_params`), in rad² s⁻².
+</ParamField>
+
+<ParamField path="kz_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ParamField path="wce_arg" type="float">
+  Electron gyrofrequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="dwds_arg" type="float">
+  Spatial gradient of the gyrofrequency along the field line dΩ_e/ds, in rad s⁻¹ m⁻¹.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  dp_∥/dt in kg m s⁻². Contains a wave-interaction term proportional to sin(η) and an adiabatic mirror-force term.
+</ResponseField>
+
+---
+
+## `dpperdt`
+
+Rate of change of the perpendicular momentum component.
+
+```python
+dpper = wpi.dpperdt(ppar_arg, pper_arg, eta_arg, w1_arg, w2_arg, beta_arg,
+                    gamma_arg, R1_arg, R2_arg, m_res_arg, wce_arg, dwds_arg)
+```
+
+<ParamField path="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="eta_arg" type="float">
+  Resonance phase angle, in radians.
+</ParamField>
+
+<ParamField path="w1_arg" type="float">
+  Right-hand trapping amplitude ω₁ (from `wpi_params`), in rad s⁻¹.
+</ParamField>
+
+<ParamField path="w2_arg" type="float">
+  Left-hand trapping amplitude ω₂ (from `wpi_params`), in rad s⁻¹.
+</ParamField>
+
+<ParamField path="beta_arg" type="float">
+  Gyro-phase argument β (from `wpi_params`), dimensionless.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ParamField path="R1_arg" type="float">
+  Polarisation ratio R₁ (from `wpi_params`).
+</ParamField>
+
+<ParamField path="R2_arg" type="float">
+  Polarisation ratio R₂ (from `wpi_params`).
+</ParamField>
+
+<ParamField path="m_res_arg" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ParamField path="wce_arg" type="float">
+  Electron gyrofrequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="dwds_arg" type="float">
+  Gradient of gyrofrequency along field line, in rad s⁻¹ m⁻¹.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  dp_⊥/dt in kg m s⁻². Bessel functions J_(m±1)(β) appear explicitly.
+</ResponseField>
+
+---
+
+## `dEkdt`
+
+Rate of change of the relativistic kinetic energy.
+
+```python
+dEk = wpi.dEkdt(pper_arg, ppar_arg, eta_arg, m_res_arg,
+                 Exw_arg, Eyw_arg, Ezw_arg, beta_arg, gamma_arg)
+```
+
+<ParamField path="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="eta_arg" type="float">
+  Resonance phase angle, in radians.
+</ParamField>
+
+<ParamField path="m_res_arg" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ParamField path="Exw_arg" type="float">
+  x-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ParamField path="Eyw_arg" type="float">
+  y-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ParamField path="Ezw_arg" type="float">
+  z-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ParamField path="beta_arg" type="float">
+  Gyro-phase argument β, dimensionless.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  dE_k/dt in J s⁻¹ (watts). Combines contributions from the field-aligned, left-hand, and right-hand electric field components weighted by Bessel functions J_m, J_(m+1), J_(m-1).
+</ResponseField>
+
+---
+
+## `dgammadt`
+
+Rate of change of the relativistic Lorentz factor γ.
+
+```python
+dg = wpi.dgammadt(pper_arg, ppar_arg, eta_arg, m_res_arg,
+                   Exw_arg, Eyw_arg, Ezw_arg, beta_arg, gamma_arg)
+```
+
+The signature is identical to `dEkdt`. Internally the result equals dE_k/dt divided by m_e c².
+
+<ParamField path="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="eta_arg" type="float">
+  Resonance phase angle, in radians.
+</ParamField>
+
+<ParamField path="m_res_arg" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ParamField path="Exw_arg" type="float">
+  x-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ParamField path="Eyw_arg" type="float">
+  y-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ParamField path="Ezw_arg" type="float">
+  z-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ParamField path="beta_arg" type="float">
+  Gyro-phase argument β, dimensionless.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  dγ/dt in s⁻¹.
+</ResponseField>
+
+---
+
+## `dalphadt`
+
+Rate of change of the local pitch angle α.
+
+```python
+da = wpi.dalphadt(pper_arg, ppar_arg, eta_arg, w1_arg, w2_arg, R1_arg, R2_arg,
+                   wtau_sq_arg, kz_arg, beta_arg, m_res_arg, gamma_arg, wce_arg, dwhds_arg)
+```
+
+<ParamField path="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="eta_arg" type="float">
+  Resonance phase angle, in radians.
+</ParamField>
+
+<ParamField path="w1_arg" type="float">
+  Right-hand trapping amplitude ω₁, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="w2_arg" type="float">
+  Left-hand trapping amplitude ω₂, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="R1_arg" type="float">
+  Polarisation ratio R₁.
+</ParamField>
+
+<ParamField path="R2_arg" type="float">
+  Polarisation ratio R₂.
+</ParamField>
+
+<ParamField path="wtau_sq_arg" type="float">
+  Squared trapping frequency ω²_τm, in rad² s⁻².
+</ParamField>
+
+<ParamField path="kz_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField path="beta_arg" type="float">
+  Gyro-phase argument β, dimensionless.
+</ParamField>
+
+<ParamField path="m_res_arg" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ParamField path="wce_arg" type="float">
+  Electron gyrofrequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="dwhds_arg" type="float">
+  Gradient of gyrofrequency along the field line dΩ_e/ds, in rad s⁻¹ m⁻¹.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  dα/dt in rad s⁻¹. Derived from `dppardt` and `dpperdt` using the chain rule on the pitch angle definition.
+</ResponseField>
+
+---
+
+## `daeqdt`
+
+Rate of change of the equatorial pitch angle α_eq.
+
+```python
+daeq = wpi.daeqdt(ppar_arg, pper_arg, alpha_arg, aeq_arg, eta_arg,
+                   w1_arg, R1_arg, w2_arg, R2_arg,
+                   gamma_arg, beta_arg, wtausq_arg, kz_arg, m_res_arg)
+```
+
+<ParamField path="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="alpha_arg" type="float">
+  Local pitch angle α, in radians.
+</ParamField>
+
+<ParamField path="aeq_arg" type="float">
+  Equatorial pitch angle α_eq, in radians.
+</ParamField>
+
+<ParamField path="eta_arg" type="float">
+  Resonance phase angle η, in radians.
+</ParamField>
+
+<ParamField path="w1_arg" type="float">
+  Right-hand trapping amplitude ω₁, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="R1_arg" type="float">
+  Polarisation ratio R₁.
+</ParamField>
+
+<ParamField path="w2_arg" type="float">
+  Left-hand trapping amplitude ω₂, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="R2_arg" type="float">
+  Polarisation ratio R₂.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ParamField path="beta_arg" type="float">
+  Gyro-phase argument β, dimensionless.
+</ParamField>
+
+<ParamField path="wtausq_arg" type="float">
+  Squared trapping frequency ω²_τm, in rad² s⁻².
+</ParamField>
+
+<ParamField path="kz_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField path="m_res_arg" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  dα_eq/dt in rad s⁻¹. The equatorial pitch angle is related to the local pitch angle through the mirror ratio; this function encodes that mapping's time derivative.
+</ResponseField>
+
+---
+
+## `detadt`
+
+Rate of change of the wave–particle resonance phase angle η.
+
+```python
+deta = wpi.detadt(ppar_arg, m_res_arg, wce_arg, wwave_arg, gamma_arg, kz_arg)
+```
+
+<ParamField path="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="m_res_arg" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ParamField path="wce_arg" type="float">
+  Electron gyrofrequency Ω_e, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="wwave_arg" type="float">
+  Wave angular frequency ω, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ParamField path="kz_arg" type="float">
+  Parallel wave number k_z, in rad m⁻¹.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  dη/dt = (m Ω_e / γ) − ω − k_z p_∥ / (m_e γ), in rad s⁻¹. When this quantity is zero the particle satisfies the resonance condition exactly.
+</ResponseField>
+
+---
+
+## `nonlinear_C0`
+
+Computes the C₀ coefficient that appears in the phase-angle (θ) inhomogeneity equation for the field-aligned electric field component.
+
+```python
+C0 = wpi.nonlinear_C0(ppar, m_res, wce, kz, gamma, Ezw)
+```
+
+<ParamField path="ppar" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="m_res" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ParamField path="wce" type="float">
+  Electron gyrofrequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="kz" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField path="gamma" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ParamField path="Ezw" type="float">
+  z-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  C₀ coefficient, in rad s⁻². Encodes the contribution of E_z to the inhomogeneity of the trapping potential.
+</ResponseField>
+
+---
+
+## `nonlinear_C1m`
+
+Computes the C₁⁻ coefficient related to the right-hand circularly polarised electric field component E_wR.
+
+```python
+C1m = wpi.nonlinear_C1m(pper_arg, ppar_arg, w1_arg, Exw_arg, Eyw_arg,
+                          m_res_arg, wce_arg, kz_arg, gamma_arg)
+```
+
+<ParamField path="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="w1_arg" type="float">
+  Right-hand trapping amplitude ω₁, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="Exw_arg" type="float">
+  x-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ParamField path="Eyw_arg" type="float">
+  y-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ParamField path="m_res_arg" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ParamField path="wce_arg" type="float">
+  Electron gyrofrequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="kz_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  C₁⁻ coefficient, in rad s⁻².
+</ResponseField>
+
+---
+
+## `nonlinear_C1p`
+
+Computes the C₁⁺ coefficient related to the left-hand circularly polarised electric field component E_wL.
+
+```python
+C1p = wpi.nonlinear_C1p(pper_arg, ppar_arg, w2_arg, Exw_arg, Eyw_arg,
+                          m_res_arg, wce_arg, kz_arg, gamma_arg)
+```
+
+<ParamField path="pper_arg" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="ppar_arg" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="w2_arg" type="float">
+  Left-hand trapping amplitude ω₂, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="Exw_arg" type="float">
+  x-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ParamField path="Eyw_arg" type="float">
+  y-component of wave electric field, in V m⁻¹.
+</ParamField>
+
+<ParamField path="m_res_arg" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ParamField path="wce_arg" type="float">
+  Electron gyrofrequency, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="kz_arg" type="float">
+  Parallel wave number, in rad m⁻¹.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  C₁⁺ coefficient, in rad s⁻².
+</ResponseField>
+
+---
+
+## `nonlinear_H`
+
+Computes the nonlinear trapping potential inhomogeneity parameter H, which measures how quickly the resonance condition drifts due to changes in k_∥, Ω_e, and the wave frequency.
+
+```python
+H = wpi.nonlinear_H(pper, ppar, kpar, gamma, m_res, m, wce,
+                     dkpar_dt, dwcdz, dwdt)
+```
+
+<ParamField path="pper" type="float">
+  Perpendicular momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="ppar" type="float">
+  Parallel momentum, in kg m s⁻¹.
+</ParamField>
+
+<ParamField path="kpar" type="float">
+  Parallel wave number k_∥, in rad m⁻¹.
+</ParamField>
+
+<ParamField path="gamma" type="float">
+  Lorentz factor.
+</ParamField>
+
+<ParamField path="m_res" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ParamField path="m" type="float">
+  Particle mass, in kg.
+</ParamField>
+
+<ParamField path="wce" type="float">
+  Gyrofrequency Ω_e, in rad s⁻¹.
+</ParamField>
+
+<ParamField path="dkpar_dt" type="float">
+  Time derivative of parallel wave number dk_∥/dt, in rad m⁻¹ s⁻¹.
+</ParamField>
+
+<ParamField path="dwcdz" type="float">
+  Spatial gradient of gyrofrequency dΩ_e/dz, in rad s⁻¹ m⁻¹.
+</ParamField>
+
+<ParamField path="dwdt" type="float">
+  Time derivative of wave frequency dω/dt, in rad s⁻².
+</ParamField>
+
+<ResponseField name="return" type="float">
+  H parameter in rad s⁻². Used to form the nonlinear S parameter via S = H / ω²_τ.
+</ResponseField>
+
+---
+
+## `nonlinear_S`
+
+Computes the dimensionless nonlinear S parameter (degree of nonlinearity). Values |S| ≪ 1 indicate the particle is deeply trapped; |S| > 1 indicates quasi-linear (untrapped) scattering.
+
+```python
+S = wpi.nonlinear_S(H, wtsq)
+```
+
+<ParamField path="H" type="float">
+  Inhomogeneity parameter H (from `nonlinear_H`), in rad s⁻².
+</ParamField>
+
+<ParamField path="wtsq" type="float">
+  Squared trapping frequency ω²_τ, in rad² s⁻². Use the absolute value returned by `nonlinear_theta`.
+</ParamField>
+
+<ResponseField name="return" type="float">
+  S = H / ω²_τ, dimensionless.
+</ResponseField>
+
+---
+
+## `nonlinear_theta`
+
+Computes the effective trapping frequency squared ω²_τ from the C coefficients and Bessel functions. Returns both the signed quantity θ and its absolute value.
+
+```python
+theta, wtsq = wpi.nonlinear_theta(C0, Cp1, Cm1, m_res, beta)
+```
+
+<ParamField path="C0" type="float">
+  C₀ coefficient (from `nonlinear_C0`), in rad s⁻².
+</ParamField>
+
+<ParamField path="Cp1" type="float">
+  C₁⁺ coefficient (from `nonlinear_C1p`), in rad s⁻².
+</ParamField>
+
+<ParamField path="Cm1" type="float">
+  C₁⁻ coefficient (from `nonlinear_C1m`), in rad s⁻².
+</ParamField>
+
+<ParamField path="m_res" type="int">
+  Resonance harmonic order m.
+</ParamField>
+
+<ParamField path="beta" type="float">
+  Gyro-phase argument β (from `wpi_params`), dimensionless.
+</ParamField>
+
+<ResponseField name="theta" type="float">
+  Signed trapping frequency squared θ = C₀ J_m(β) + C₁⁺ J_(m+1)(β) + C₁⁻ J_(m-1)(β), in rad s⁻².
+</ResponseField>
+
+<ResponseField name="wtsq" type="float">
+  |θ|, the absolute value used as ω²_τ in `nonlinear_S`. In rad² s⁻².
+</ResponseField>
+
+---
+
+## Complete simulation step example
+
+The snippet below shows one full Runge–Kutta step for an electron at the first cyclotron resonance with a whistler wave.
+
+```python
+import numpy as np
+import WPIT.WPI_mod.whistler_electron_mod as wpi
+from WPIT.Environment_mod import const
+
+# ---- Particle state ----
+ppar  = -1.5e-23   # kg m/s, parallel momentum
+pper  =  2.0e-23   # kg m/s, perpendicular momentum
+lamda =  0.05      # rad,    magnetic latitude
+eta   =  0.3       # rad,    resonance phase
+
+# ---- Wave parameters ----
+m_res  = 1
+Bxw, Byw     = 1e-12, 1e-12   # T
+Exw, Eyw, Ezw = 3e-4, 3e-4, 1e-5  # V/m
+kz, kx        = 2e-4, 5e-5    # rad/m
+wce    = 1.2e5   # rad/s   |Omega_e|
+wwave  = 4.0e4   # rad/s
+dwds   = -1.0e-2  # rad/s/m
+L      = 4.0
+
+# ---- Pre-compute coupling parameters ----
+gamma, w1, w2, wtau_sq, R1, R2, beta = wpi.wpi_params(
+    m_res, ppar, pper, Bxw, Byw, Exw, Eyw, Ezw, kz, kx, wce
+)
+
+# ---- Equations of motion ----
+dppar  = wpi.dppardt(pper, eta, wtau_sq, kz, gamma, wce, dwds)
+dpper  = wpi.dpperdt(ppar, pper, eta, w1, w2, beta, gamma, R1, R2, m_res, wce, dwds)
+dz     = wpi.dzdt(ppar, gamma, const.me)
+dlamda = wpi.dlamdadt(ppar, lamda, gamma, L)
+deta   = wpi.detadt(ppar, m_res, wce, wwave, gamma, kz)
+dEk    = wpi.dEkdt(pper, ppar, eta, m_res, Exw, Eyw, Ezw, beta, gamma)
+
+# ---- Nonlinear trapping diagnostics ----
+C0  = wpi.nonlinear_C0(ppar, m_res, wce, kz, gamma, Ezw)
+C1m = wpi.nonlinear_C1m(pper, ppar, w1, Exw, Eyw, m_res, wce, kz, gamma)
+C1p = wpi.nonlinear_C1p(pper, ppar, w2, Exw, Eyw, m_res, wce, kz, gamma)
+theta, wtsq = wpi.nonlinear_theta(C0, C1p, C1m, m_res, beta)
+
+H = wpi.nonlinear_H(pper, ppar, kz, gamma, m_res, const.me, wce, 0.0, dwds, 0.0)
+S = wpi.nonlinear_S(H, wtsq)
+
+print(f"S = {S:.3f}  ({'trapped' if abs(S) < 1 else 'untrapped'})")
+```
+
+<Note>
+The `dkpar_dt` argument of `nonlinear_H` represents the convective derivative of k_∥ along the ray path, not simply dk/dt. If ray-tracing is not performed simultaneously, this can be approximated as zero for a monochromatic CW wave.
+</Note>

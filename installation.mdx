@@ -1,0 +1,145 @@
+---
+title: "Installing WPIT: Python Dependencies and Verification"
+sidebarTitle: "Installation"
+description: "Step-by-step instructions for cloning WPIT, installing pinned Python packages with pip, and verifying the setup with a quick import check."
+---
+
+WPIT is not distributed through PyPI or conda-forge. The entire toolset lives in a single Git repository that you clone to your local machine and then point Python at. This page covers every step from prerequisites to a verified installation.
+
+## Prerequisites
+
+| Requirement | Minimum version |
+|---|---|
+| Python | 3.6 |
+| pip | any recent version |
+| Git | any recent version |
+| (optional) Jupyter Notebook | 6.4.1 (bundled in `requirements.txt`) |
+
+A virtual environment (e.g. `python3 -m venv wpit-env`) is strongly recommended so that the pinned package versions do not conflict with other projects on your system.
+
+## Step 1 — Clone the Repository
+
+```bash
+git clone https://github.com/stourgai/WPIT.git
+cd WPIT
+```
+
+After cloning you will see the following top-level layout:
+
+```
+WPIT/
+├── WPIT/                  # Python source (modules + sub-modules)
+├── Module_descriptions/   # Jupyter Notebooks with theory and examples
+├── WPIT_tests/            # Verification notebooks (literature reproductions)
+├── WPIT_results/          # Paper simulation notebooks
+├── Documentation/         # HTML API docs
+└── requirements.txt
+```
+
+## Step 2 — Install Package Dependencies
+
+All required packages are listed with exact version pins in `requirements.txt`:
+
+```
+matplotlib==3.2.0
+pandas==1.1.5
+scipy==1.5.4
+spacepy==0.2.2
+numpy==1.19.5
+notebook==6.4.1
+```
+
+Install them in one command:
+
+```bash
+pip install -r requirements.txt
+```
+
+<Warning>
+**SpacePy requires special attention.** `spacepy==0.2.2` depends on the NASA CDF library and may need a Fortran compiler. If `pip install -r requirements.txt` fails at the SpacePy step:
+
+1. Install the CDF library from [https://cdf.gsfc.nasa.gov](https://cdf.gsfc.nasa.gov).
+2. On Ubuntu/Debian, also run: `sudo apt-get install gfortran`.
+3. Then retry `pip install spacepy==0.2.2`.
+
+Full instructions are at [https://spacepy.github.io/install.html](https://spacepy.github.io/install.html).
+</Warning>
+
+## Step 3 — Make WPIT Importable
+
+Because WPIT is not installed as a package, Python must be able to find the repo root on its path. The easiest approach is to launch Python (or Jupyter) from inside the cloned `WPIT/` directory, or to add the path explicitly at the top of each script:
+
+```python
+import sys
+sys.path.insert(0, '/path/to/WPIT')   # full path to the cloned directory
+```
+
+Alternatively, install WPIT in editable mode (no `setup.py` is shipped, but you can create a minimal one, or simply rely on the `sys.path` approach above).
+
+## Step 4 — Verify the Installation
+
+Run the following snippet to confirm that all four modules import successfully and that a basic calculation returns a sensible result:
+
+```python
+import sys
+sys.path.insert(0, '.')   # run from inside the WPIT/ directory
+
+import numpy as np
+import WPIT.Environment_mod as env
+import WPIT.WaveProperties_mod as wave
+import WPIT.WPI_mod.whistler_electron_mod as wpi
+import WPIT.LandauDamp_mod as ld
+
+# Quick sanity check: dipole field at L=4, equator
+B = env.Bmag_dipole(4.0, 0.0)
+assert 50e-9 < B < 200e-9, "Unexpected dipole field value"
+
+print("✓ Environment_mod imported and Bmag_dipole returned", f"{B*1e9:.1f} nT")
+print("✓ WaveProperties_mod imported")
+print("✓ WPI_mod.whistler_electron_mod imported")
+print("✓ LandauDamp_mod imported")
+print("All modules loaded successfully.")
+```
+
+Expected output:
+
+```
+✓ Environment_mod imported and Bmag_dipole returned 97.5 nT
+✓ WaveProperties_mod imported
+✓ WPI_mod.whistler_electron_mod imported
+✓ LandauDamp_mod imported
+All modules loaded successfully.
+```
+
+## Using Jupyter Notebook
+
+The `Module_descriptions/` and `WPIT_tests/` directories contain interactive Jupyter Notebooks that serve as both tutorials and verification tests. To open them:
+
+```bash
+# From inside the WPIT/ directory
+jupyter notebook
+```
+
+Your browser will open the Notebook dashboard. Navigate to `Module_descriptions/Environment_mod_description.ipynb` to start with a guided tour of `Environment_mod`.
+
+<Tip>
+The Jupyter Notebook server version is pinned to `6.4.1` in `requirements.txt`. If you already have a different version installed globally, consider using a virtual environment to avoid version conflicts.
+</Tip>
+
+## Tested Configuration
+
+The following exact combination was used during development and testing:
+
+| Package | Version | Notes |
+|---|---|---|
+| Python | 3.6.9 | Ubuntu 18.04 LTS |
+| matplotlib | 3.2.0 | Plotting |
+| numpy | 1.19.5 | Numerical arrays |
+| scipy | 1.5.4 | Integration, special functions |
+| pandas | 1.1.5 | Ray-file I/O in LandauDamp_mod |
+| spacepy | 0.2.2 | Space physics utilities |
+| notebook | 6.4.1 | Jupyter Notebook server |
+
+<Note>
+WPIT may work with newer versions of these packages, but only the pinned versions listed above have been formally tested. If you encounter unexpected behavior with newer packages, downgrade to the pinned versions as a first troubleshooting step.
+</Note>

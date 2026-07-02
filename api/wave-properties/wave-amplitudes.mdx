@@ -1,0 +1,472 @@
+---
+title: "Wave Field Amplitudes and Packet Envelopes in WPIT"
+sidebarTitle: "Wave Amplitudes"
+description: "API reference for Bell, Li, and Jasna wave-field components plus Gaussian, one-sided, and two-sided wave-packet envelope models in WPIT WaveProperties_mod."
+---
+
+The wave-amplitude functions in `WaveProperties_mod` resolve an obliquely propagating whistler-mode wave into its six electromagnetic field components (Bx, By, Bz, Ex, Ey, Ez) in a coordinate system where z is aligned with the background magnetic field **B₀**. Three normalisation conventions are provided: Bell (1984), which normalises to the By component; Li et al. (2015), which normalises to the total wave magnetic-field amplitude; and Jasna et al. (1992), which normalises to the Poynting flux (power density). The wave-packet functions provide parameterised spatial envelopes (Gaussian or tanh-based) for simulating the latitudinal amplitude profile of magnetospheric wave emissions.
+
+```python
+import WPIT.WaveProperties_mod as wave
+```
+
+---
+
+## `wave_amplitudes_bell`
+
+Computes all six wave electromagnetic field components for an obliquely propagating whistler-mode wave using the polarisation relations derived by Bell (1984). The input wave amplitude is specified as the By component; all other components are expressed as ratios relative to By.
+
+**Reference:** Bell, T. F. (1984). The nonlinear gyroresonance interaction between energetic electrons and coherent VLF waves propagating at an arbitrary angle with respect to the Earth's magnetic field. *JGR: Space Physics* 89, 905–918.
+
+```python
+Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_bell(
+    mu_arg, P_arg, D_arg, S_arg, Byw_arg, theta_arg
+)
+```
+
+### Parameters
+
+<ParamField path="mu_arg" type="float" required>
+  Refractive index η (dimensionless). Obtain from `refr_index_full`, `refr_index_appleton`,
+  or `refr_index_warm`.
+</ParamField>
+
+<ParamField path="P_arg" type="float" required>
+  Stix P parameter (from `stix_parameters` or `stix_parameters_warm`).
+</ParamField>
+
+<ParamField path="D_arg" type="float" required>
+  Stix D parameter.
+</ParamField>
+
+<ParamField path="S_arg" type="float" required>
+  Stix S parameter.
+</ParamField>
+
+<ParamField path="Byw_arg" type="float" required>
+  Amplitude of the By wave magnetic field component [T]. This sets the absolute scale
+  of all returned field components.
+</ParamField>
+
+<ParamField path="theta_arg" type="float" required>
+  Wave normal angle θ with respect to **B₀** [rad].
+</ParamField>
+
+### Returns
+
+<ResponseField name="Bxw_arg" type="float">
+  Bx component of the wave magnetic field [T].
+  `Bx = −(D × f₁) / (P × (S − η²)) × By`
+</ResponseField>
+
+<ResponseField name="Byw_arg" type="float">
+  By component of the wave magnetic field [T]. Equal to the input `Byw_arg`.
+</ResponseField>
+
+<ResponseField name="Bzw_arg" type="float">
+  Bz component of the wave magnetic field [T].
+  `Bz = (D sin θ × f₁) / (P cos θ × (S − η²)) × By`
+</ResponseField>
+
+<ResponseField name="Exw_arg" type="float">
+  Ex component of the wave electric field [V m⁻¹].
+  `Ex = (c × f₁) / (η P cos θ) × By`
+</ResponseField>
+
+<ResponseField name="Eyw_arg" type="float">
+  Ey component of the wave electric field [V m⁻¹].
+  `Ey = (D c × f₁) / (η P cos θ × (η² − S)) × By`
+</ResponseField>
+
+<ResponseField name="Ezw_arg" type="float">
+  Ez component of the wave electric field [V m⁻¹].
+  `Ez = −(c η sin θ / P) × By`
+</ResponseField>
+
+<Note>
+  In all three component formulae, `f₁ = P − η² sin² θ`. The polarisation ratios diverge
+  when `S = η²` (wave at Buchsbaum resonance) or `P = 0` (upper hybrid resonance);
+  avoid these limits.
+</Note>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w     = 2 * np.pi * 5e3
+theta = np.deg2rad(20)
+By0   = 1e-10                   # 100 pT
+
+# Compute Stix parameters and refractive index first
+S, D, P, R, L = wave.stix_parameters(w, 1e7, 0.9e7, 0.05e7, 0.05e7, 3e-5)
+_, _, eta, *_ = wave.refr_index_full(theta, w, S, P, R, L)
+
+Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_bell(eta, P, D, S, By0, theta)
+
+print(f"Bx = {Bx:.4e} T,  By = {By:.4e} T,  Bz = {Bz:.4e} T")
+print(f"Ex = {Ex:.4e} V/m, Ey = {Ey:.4e} V/m, Ez = {Ez:.4e} V/m")
+```
+
+---
+
+## `wave_amplitudes_li`
+
+Computes the six wave electromagnetic field components using the normalisation convention of Li et al. (2015), where the amplitude is set by the **total** wave magnetic field magnitude |B_w|. An intermediate normalisation factor I_w is derived from |B_w| and the Stix parameters, ensuring that `√(Bx² + By² + Bz²) = |B_w|` by construction.
+
+**Reference:** Li, J., Bortnik, J., Xie, L., Pu, Z., Chen, L., Ni, B., et al. (2015). Comparison of formulas for resonant interactions between energetic electrons and oblique whistler-mode waves. *Physics of Plasmas* 22, 052902.
+
+```python
+Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_li(
+    mu, P, D, S, Bw_tot_li, psi
+)
+```
+
+### Parameters
+
+<ParamField path="mu" type="float" required>
+  Refractive index η (dimensionless).
+</ParamField>
+
+<ParamField path="P" type="float" required>
+  Stix P parameter.
+</ParamField>
+
+<ParamField path="D" type="float" required>
+  Stix D parameter.
+</ParamField>
+
+<ParamField path="S" type="float" required>
+  Stix S parameter.
+</ParamField>
+
+<ParamField path="Bw_tot_li" type="float" required>
+  Total wave magnetic field magnitude |B_w| [T]. This is the observationally reported
+  amplitude that satellite instruments typically measure.
+</ParamField>
+
+<ParamField path="psi" type="float" required>
+  Wave normal angle ψ with respect to **B₀** [rad].
+</ParamField>
+
+### Returns
+
+<ResponseField name="Bxw_li" type="float">
+  Bx component [T]. `Bx = −I_w D cos ψ f₁ η`
+</ResponseField>
+
+<ResponseField name="Byw_li" type="float">
+  By component [T]. `By = I_w P cos ψ (S − η²) η`
+</ResponseField>
+
+<ResponseField name="Bzw_li" type="float">
+  Bz component [T]. `Bz = I_w D sin ψ f₁ η`
+</ResponseField>
+
+<ResponseField name="Exw_li" type="float">
+  Ex component [V m⁻¹]. `Ex = c I_w f₁ (S − η²)`
+</ResponseField>
+
+<ResponseField name="Eyw_li" type="float">
+  Ey component [V m⁻¹]. `Ey = c I_w D f₁`
+</ResponseField>
+
+<ResponseField name="Ezw_li" type="float">
+  Ez component [V m⁻¹]. `Ez = −c I_w η² cos ψ sin ψ (S − η²)`
+</ResponseField>
+
+<Note>
+  The Li et al. convention is preferred when comparing with in-situ satellite observations
+  that report the root-mean-square magnetic fluctuation amplitude. The normalisation factor
+  I_w is derived internally and should not be confused with wave intensity.
+</Note>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w       = 2 * np.pi * 5e3
+psi     = np.deg2rad(25)
+Bw_tot  = 3e-10                 # 300 pT total amplitude
+
+S, D, P, R, L = wave.stix_parameters(w, 1e7, 0.9e7, 0.05e7, 0.05e7, 3e-5)
+_, _, eta, *_ = wave.refr_index_full(psi, w, S, P, R, L)
+
+Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_li(eta, P, D, S, Bw_tot, psi)
+
+import numpy as np
+B_mag = np.sqrt(Bx**2 + By**2 + Bz**2)
+print(f"|B| = {B_mag:.4e} T  (should equal {Bw_tot:.4e} T)")
+```
+
+---
+
+## `wave_amplitudes_jasna`
+
+Computes the six wave electromagnetic field components using the Jasna et al. (1992) normalisation, where the wave amplitude is set by the **Poynting flux** (power density) `power_arg` in mW m⁻². The function first derives the By amplitude from the Poynting flux expression, then applies Bell (1984) polarisation ratios internally.
+
+**Reference:** Jasna, D., Inan, U. S., and Bell, T. F. (1992). Precipitation of suprathermal (100 eV) electrons by oblique whistler waves. *Geophysical Research Letters* 19, 1639–1642.
+
+```python
+Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_jasna(
+    P_arg, S_arg, D_arg, theta_arg, ref_arg, power_arg
+)
+```
+
+### Parameters
+
+<ParamField path="P_arg" type="float" required>
+  Stix P parameter.
+</ParamField>
+
+<ParamField path="S_arg" type="float" required>
+  Stix S parameter.
+</ParamField>
+
+<ParamField path="D_arg" type="float" required>
+  Stix D parameter.
+</ParamField>
+
+<ParamField path="theta_arg" type="float" required>
+  Wave normal angle θ with respect to **B₀** [rad].
+</ParamField>
+
+<ParamField path="ref_arg" type="float" required>
+  Refractive index η (dimensionless).
+</ParamField>
+
+<ParamField path="power_arg" type="float" required>
+  Wave Poynting flux (power density) [mW m⁻²]. Values from global VLF propagation models
+  are typically in the range 10⁻⁴ – 10⁻¹ mW m⁻².
+</ParamField>
+
+### Returns
+
+<ResponseField name="Bxw_arg" type="float">
+  Bx component of the wave magnetic field [T].
+</ResponseField>
+
+<ResponseField name="Byw_arg" type="float">
+  By component of the wave magnetic field [T]. Derived from the Poynting-flux normalisation.
+</ResponseField>
+
+<ResponseField name="Bzw_arg" type="float">
+  Bz component of the wave magnetic field [T].
+</ResponseField>
+
+<ResponseField name="Exw_arg" type="float">
+  Ex component of the wave electric field [V m⁻¹].
+</ResponseField>
+
+<ResponseField name="Eyw_arg" type="float">
+  Ey component of the wave electric field [V m⁻¹].
+</ResponseField>
+
+<ResponseField name="Ezw_arg" type="float">
+  Ez component of the wave electric field [V m⁻¹].
+</ResponseField>
+
+<Note>
+  The Jasna convention is well suited for global VLF propagation models that output
+  Poynting flux rather than field amplitude. The intermediate variable `Byw_sq` is
+  computed from the Poynting flux using the Xstix and polarisation ratio `ρ₂`, then
+  passed to Bell (1984) relations to obtain the remaining components.
+</Note>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+w      = 2 * np.pi * 5e3
+theta  = np.deg2rad(15)
+power  = 1e-3                    # 1e-3 mW m^-2
+
+S, D, P, R, L = wave.stix_parameters(w, 1e7, 0.9e7, 0.05e7, 0.05e7, 3e-5)
+_, _, eta, *_ = wave.refr_index_full(theta, w, S, P, R, L)
+
+Bx, By, Bz, Ex, Ey, Ez = wave.wave_amplitudes_jasna(
+    P, S, D, theta, eta, power
+)
+print(f"By = {By:.4e} T from {power} mW/m^2 Poynting flux")
+```
+
+---
+
+## `wave_packet_gauss`
+
+Returns the wave magnetic field amplitude at a given magnetic latitude by modulating the peak amplitude `Bw0_arg` with a Gaussian envelope centred on the magnetic equator (λ = 0). This is a standard parameterisation for chorus and whistler-mode wave packets near the equator.
+
+```python
+Bwave = wave.wave_packet_gauss(Bw0_arg, lamda_arg, lamda_range)
+```
+
+### Parameters
+
+<ParamField path="Bw0_arg" type="float" required>
+  Peak (equatorial) wave magnetic field amplitude [T].
+</ParamField>
+
+<ParamField path="lamda_arg" type="float" required>
+  Magnetic latitude λ at the point of interest [rad].
+</ParamField>
+
+<ParamField path="lamda_range" type="float" required>
+  Characteristic half-width of the Gaussian envelope [rad].
+  The amplitude falls to 1/e of the peak at |λ| = `lamda_range`.
+</ParamField>
+
+### Returns
+
+<ResponseField name="Bwave" type="float">
+  Wave magnetic field amplitude at latitude λ [T].
+  `Bwave = Bw0 × exp(−λ² / λ_range²)`
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+Bw0         = 1e-9                      # 1 nT peak
+lamda_range = np.deg2rad(5)             # 5° half-width
+latitudes   = np.deg2rad(np.linspace(-20, 20, 200))
+
+Bwave = np.array([
+    wave.wave_packet_gauss(Bw0, lat, lamda_range) for lat in latitudes
+])
+
+import matplotlib.pyplot as plt
+plt.plot(np.rad2deg(latitudes), Bwave * 1e9)
+plt.xlabel("Magnetic latitude (°)")
+plt.ylabel("B_wave (nT)")
+plt.title("Gaussian wave packet")
+plt.show()
+```
+
+---
+
+## `wave_packet_one_sided`
+
+Returns the wave amplitude modulated by a one-sided hyperbolic-tangent (tanh) envelope, producing a profile that rises from near zero and approaches the peak amplitude `Bw0_arg` in either the northern or southern hemisphere. This represents a wave packet that is spatially confined to one hemisphere.
+
+```python
+Bwave = wave.wave_packet_one_sided(Bw0_arg, lamda_arg, shape, location, direction)
+```
+
+### Parameters
+
+<ParamField path="Bw0_arg" type="float" required>
+  Maximum (plateau) wave magnetic field amplitude [T].
+</ParamField>
+
+<ParamField path="lamda_arg" type="float" required>
+  Magnetic latitude at the point of interest [rad].
+</ParamField>
+
+<ParamField path="shape" type="float" required>
+  Controls the steepness of the envelope edge. Higher values produce sharper transitions.
+  Dimensionless; typical values: 1–10.
+</ParamField>
+
+<ParamField path="location" type="float" required>
+  Latitude of the half-maximum (HWHM) point [degrees].
+  The envelope reaches 50% of its plateau at this latitude.
+</ParamField>
+
+<ParamField path="direction" type="str" required>
+  Hemisphere of propagation. Must be `"north"` (packet active at northern latitudes)
+  or `"south"` (packet active at southern latitudes).
+</ParamField>
+
+### Returns
+
+<ResponseField name="Bwave" type="float">
+  Wave magnetic field amplitude at latitude λ [T].
+  `Bwave = Bw0 × (tanh(±shape × λ_deg − 2 × location) + 1) / 2`
+  where the sign is +1 for north, −1 for south.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+Bw0       = 1e-9                         # 1 nT
+latitudes = np.deg2rad(np.linspace(0, 30, 200))
+
+Bwave_N = np.array([
+    wave.wave_packet_one_sided(Bw0, lat, shape=3, location=10, direction='north')
+    for lat in latitudes
+])
+```
+
+<Note>
+  The `location` parameter is in **degrees** even though `lamda_arg` is in radians.
+  The function converts `lamda_arg` to degrees internally via `np.rad2deg` before
+  applying the tanh formula.
+</Note>
+
+---
+
+## `wave_packet_two_sided`
+
+Returns the wave amplitude modulated by a symmetric two-sided tanh envelope that is peaked at the equator (λ ≈ 0) and rolls off towards both hemispheres. This models a wave packet active near the magnetic equator with a well-defined latitudinal extent.
+
+```python
+Bwave = wave.wave_packet_two_sided(Bw0_arg, lamda_arg, shape, location)
+```
+
+### Parameters
+
+<ParamField path="Bw0_arg" type="float" required>
+  Equatorial (peak) wave magnetic field amplitude [T].
+</ParamField>
+
+<ParamField path="lamda_arg" type="float" required>
+  Magnetic latitude at the point of interest [rad].
+</ParamField>
+
+<ParamField path="shape" type="float" required>
+  Controls steepness of the roll-off. Higher values produce sharper packet edges.
+  Dimensionless.
+</ParamField>
+
+<ParamField path="location" type="float" required>
+  Latitude of the half-maximum (HWHM) point [degrees].
+</ParamField>
+
+### Returns
+
+<ResponseField name="Bwave" type="float">
+  Wave magnetic field amplitude at latitude λ [T].
+  The envelope is symmetric about the equator: it applies a tanh roll-off with
+  `+shape` for λ > 0 and `−shape` for λ < 0, both anchored at `location` degrees.
+</ResponseField>
+
+### Example
+
+```python
+import WPIT.WaveProperties_mod as wave
+import numpy as np
+
+Bw0       = 1e-9
+latitudes = np.deg2rad(np.linspace(-20, 20, 400))
+
+Bwave_2s = np.array([
+    wave.wave_packet_two_sided(Bw0, lat, shape=4, location=8)
+    for lat in latitudes
+])
+```
+
+<Note>
+  Unlike `wave_packet_gauss`, the two-sided tanh envelope has a flat top near the equator
+  for small `location` values. Increase `shape` to steepen the edges and decrease
+  `location` to narrow the packet.
+</Note>

@@ -1,0 +1,210 @@
+---
+title: "Environment_mod: Magnetospheric Background Reference"
+sidebarTitle: "Environment"
+description: "Environment_mod: dipole field, Sheeley and Carpenter-Anderson density models, plasma frequencies, loss cone, orbital periods, and pitch-angle conversions."
+---
+
+`Environment_mod` is the foundation of every WPIT simulation. It provides the geomagnetic field, particle number densities, characteristic frequencies, and the orbital parameters needed to initialize particle trajectories. All functions are importable directly from the module namespace.
+
+```python
+import WPIT.Environment_mod as env
+```
+
+Physical constants (masses, charges, speed of light, vacuum permittivity, etc.) are available as module-level attributes of `env.const` — you never need to hard-code a fundamental constant.
+
+## Physical Constants
+
+`env.const` (defined in `WPIT/Environment_mod/const.py`) exposes:
+
+| Attribute | Value | Description |
+|---|---|---|
+| `Re` | 6 378 137 m | Earth mean radius |
+| `c_light` | 2.998 × 10⁸ m/s | Speed of light |
+| `me` | 9.109 × 10⁻³¹ kg | Electron mass |
+| `qe` | 1.602 × 10⁻¹⁹ C | Electron charge |
+| `qi` | 1.602 × 10⁻¹⁹ C | Ion (proton) charge |
+| `mH` | 1.673 × 10⁻²⁷ kg | Hydrogen ion mass |
+| `mHe` | 6.690 × 10⁻²⁷ kg | Helium ion mass |
+| `mO` | 2.676 × 10⁻²⁶ kg | Oxygen ion mass |
+| `epsilon0` / `eps0` | 8.854 × 10⁻¹² F/m | Vacuum permittivity |
+| `mu0` | 1.257 × 10⁻⁶ H/m | Vacuum permeability |
+| `kb` | 1.381 × 10⁻²³ J/K | Boltzmann constant |
+
+## Geomagnetic Dipole Field
+
+### `env.Bmag_dipole(L, lamda)`
+
+Returns the scalar magnetic field strength at L-shell `L` and magnetic latitude `lamda` (radians) using the standard centred-dipole formula (Parks, 1991, p. 54):
+
+```
+B(L, λ) = (B₀ / L³) × √(1 + 3 sin²λ) / cos⁶λ
+```
+
+where B₀ = 31 200 nT is the equatorial surface field.
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+B = env.Bmag_dipole(L_arg=4.0, lamda_arg=np.deg2rad(30.0))
+print(f"B = {B * 1e9:.2f} nT")
+```
+
+**Inputs:** `L_arg` (L-shell, dimensionless), `lamda_arg` (magnetic latitude, radians)  
+**Output:** `Bmag` (magnetic field strength, Tesla)
+
+Additional field-related routines include `env.dB_ds` (gradient of B along the field line) and `env.dwc_ds` (gradient of the cyclotron frequency along the field line), both needed by the WPI equations of motion.
+
+## Plasma Density Models
+
+WPIT implements four empirical electron density models covering the plasmasphere, plasmapause, and plasma trough.
+
+### Sheeley Model
+
+`env.density_equ_sheeley(L)` — Equatorial electron density after Sheeley et al. (2001). Returns mean, lower, and upper estimates using simple power-law fits to CRRES observations:
+
+```
+ne_mean = 1390 × (3/L)^4.8   [cm⁻³]
+```
+
+```python
+ne_mean, ne_min, ne_max = env.density_equ_sheeley(5.0)
+print(f"Equatorial density: {ne_mean:.1f} cm⁻³  ({ne_min:.1f}–{ne_max:.1f})")
+```
+
+**Input:** `L_arg` (L-shell)  
+**Outputs:** `ne_mean`, `ne_min`, `ne_max` (cm⁻³)
+
+### Carpenter-Anderson Model
+
+`env.density_equ_carpenter_anderson(Lsh, Kpmax, day, mlt, Rb)` — Comprehensive ISEE/whistler-based model (Carpenter & Anderson, 1992) that accounts for the plasmapause location as a function of geomagnetic activity, day of year, magnetic local time, and the 13-month average sunspot number. It internally computes the inner plasmapause boundary `L_ppi`, the saturated plasmasphere, the plasmapause transition, and the extended plasma trough, returning the density at the requested L-shell.
+
+```python
+ne = env.density_equ_carpenter_anderson(
+    Lsh=5.0,
+    Kpmax=3.0,    # maximum Kp in preceding 24 hours
+    day=180,      # day of year
+    mlt=12.0,     # magnetic local time (hours)
+    Rb=100        # 13-month mean sunspot number
+)
+print(f"Carpenter-Anderson density: {ne:.2f} cm⁻³")
+```
+
+### Ozhogin Model
+
+`env.density_ozhogin(L, lamda)` — Field-line density profile at arbitrary magnetic latitude after Ozhogin et al.
+
+### Denton Field-Line Model
+
+`env.density_FL_denton(L, lamda)` — Field-line density model after Denton et al., suitable for tracing density variation along a flux tube.
+
+<Tip>
+Use **Sheeley** for quick order-of-magnitude estimates. Use **Carpenter-Anderson** when you need to account for storm-time plasmapause erosion or seasonal effects. Use **Denton** or **Ozhogin** when you need the full latitudinal density profile along the field line rather than just the equatorial value.
+</Tip>
+
+## Characteristic Frequencies
+
+### Cyclotron Frequency
+
+`env.omega_cyclotron(B, q, m)` — Gyrofrequency (rad/s) for any charged species:
+
+```python
+wce = env.omega_cyclotron(B, env.const.qe, env.const.me)   # electrons
+wci = env.omega_cyclotron(B, env.const.qi, env.const.mH)    # protons
+```
+
+**Inputs:** `B_arg` (T), `q_arg` (C), `m_arg` (kg)  
+**Output:** `omega_tmp` (rad/s)
+
+### Plasma Frequency
+
+`env.omega_plasma(n, q, m)` — Angular plasma frequency (rad/s):
+
+```python
+ne_m3 = ne_mean * 1e6          # cm⁻³ → m⁻³
+wpe = env.omega_plasma(ne_m3, env.const.qe, env.const.me)
+```
+
+**Inputs:** `n_arg` (m⁻³), `q_arg` (C), `m_arg` (kg)  
+**Output:** `omegap_tmp` (rad/s)
+
+### Lower Hybrid Resonance Frequency
+
+`env.omega_lhr(wce, wpe, wci, wpi)` — Lower hybrid resonance frequency, combining both electron and ion contributions:
+
+```python
+wci  = env.omega_cyclotron(B, env.const.qi, env.const.mH)
+wpi  = env.omega_plasma(ne_m3, env.const.qi, env.const.mH)
+wlhr = env.omega_lhr(wce, wpe, wci, wpi)
+```
+
+### Upper Hybrid Resonance Frequency
+
+`env.omega_uhr(wpe, wce)` — Upper hybrid resonance frequency.
+
+## Particle Orbital Parameters
+
+### Loss Cone
+
+`env.loss_cone(L)` — Equatorial loss cone angle in radians (Kivelson & Russell, 1995):
+
+```python
+alpha_lc = env.loss_cone(5.0)
+print(f"Loss cone at L=5: {np.rad2deg(alpha_lc):.2f}°")
+```
+
+`env.loss_cone_v2(L)` provides an alternative formulation for comparison.
+
+### Bounce and Drift Periods
+
+`env.T_bounce(L, Ek, alpha_eq, m)` — Relativistic bounce period for a particle of kinetic energy `Ek` and equatorial pitch angle `alpha_eq` at L-shell `L`.
+
+`env.T_drift(L, Ek, m, q)` — Magnetic drift period around the Earth.
+
+### Larmor Radius
+
+`env.R_Larmor(pper, m, q, B)` — Larmor (gyro) radius in meters, given the perpendicular momentum `pper`, species mass, charge, and field magnitude.
+
+### L-shell
+
+`env.Lshell(r, lamda)` — Convert geocentric distance `r` (meters) and magnetic latitude `lamda` (radians) to L-shell.
+
+### Adiabatic Invariant
+
+`env.mu_adiabatic(pper, m, B)` — First adiabatic invariant µ = p⊥²/(2mB).
+
+## Phase-Space Conversions
+
+Switching between the local pitch angle α (defined with respect to the local field direction) and the equatorial pitch angle αeq (conserved under adiabatic bounce motion) is essential when initializing particles and when recording their trajectories.
+
+### `env.aeq2alpha(aeq, L, lamda)`
+
+Convert equatorial pitch angle `aeq` (radians) to local pitch angle `alpha` at magnetic latitude `lamda` on L-shell `L`.
+
+### `env.alpha2aeq(alpha, L, lamda)`
+
+Convert local pitch angle `alpha` to equatorial pitch angle `aeq`.
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+aeq   = np.deg2rad(68.0)          # equatorial pitch angle
+L     = 5.0
+lamda = np.deg2rad(20.0)
+
+alpha = env.aeq2alpha(aeq, L, lamda)
+print(f"Local pitch angle: {np.rad2deg(alpha):.2f}°")
+
+# Round-trip check
+aeq_back = env.alpha2aeq(alpha, L, lamda)
+print(f"Recovered aeq: {np.rad2deg(aeq_back):.2f}°")
+```
+
+### `env.initial_velocity(Ek, alpha, m)`
+
+Decompose a particle's kinetic energy and local pitch angle into parallel (`ppar`) and perpendicular (`pper`) momentum components, needed as initial conditions for the ODE integrator in `WPI_mod`.
+
+<Accordion title="Debye Length">
+`env.debye_length(ne, Te)` computes the electron Debye length in meters, useful for checking the validity of the cold-plasma approximation (which requires the Debye length to be much smaller than the wavelength of interest).
+</Accordion>

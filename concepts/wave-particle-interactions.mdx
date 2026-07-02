@@ -1,0 +1,278 @@
+---
+title: "WPI_mod: Gyro-Averaged Equations of Motion, Test Particle"
+sidebarTitle: "Wave-Particle Interactions"
+description: "WPI_mod: gyro-averaged equations of motion, nonlinearity parameters, sub-modules for whistler-electron and EMIC-ion wave-particle interactions."
+---
+
+`WPI_mod` is the dynamical heart of WPIT. It implements the relativistic, gyro-averaged equations of motion that govern how a charged particle's momentum and position change as it moves along a magnetic field line and interacts with a propagating electromagnetic wave. The module is organized into three sub-modules, each targeting a specific wave-particle pair, but all three share the same conceptual framework.
+
+```python
+import WPIT.WPI_mod.whistler_electron_mod as wpi
+# or
+import WPIT.WPI_mod.EMIC_ion_mod as emic
+# or
+import WPIT.WPI_mod.parallel_EMIC_mod as pemic
+```
+
+## The Test-Particle Method
+
+In the test-particle approach, individual particles are treated as point charges moving under the combined influence of the background geomagnetic field and the wave fields. The word "test" means that the particle does not feed back on the wave — the wave fields are prescribed, and the particle responds to them. This is valid when the wave amplitude is small compared to the background field, or when the goal is to characterize single-particle dynamics before constructing a statistical ensemble.
+
+The **gyro-averaging** approximation integrates out the rapid cyclotron motion, retaining only the slower bounce and drift timescales. The result is a set of coupled ODEs in the bounce-averaged coordinates (field-line position `z`, magnetic latitude `λ`, parallel momentum `p‖`, perpendicular momentum `p⊥`, phase angle `η`, kinetic energy `Ek`, local pitch angle `α`, equatorial pitch angle `αeq`, and Lorentz factor `γ`) that can be integrated with a standard ODE solver (e.g., `scipy.integrate.odeint`).
+
+## Sub-Modules
+
+<CardGroup cols={2}>
+  <Card title="whistler_electron_mod" icon="zap">
+    Electrons interacting with obliquely propagating whistler-mode (chorus) waves. Supports arbitrary wave normal angle θ and resonance harmonic m_res.
+  </Card>
+  <Card title="EMIC_ion_mod" icon="atom">
+    Ions (H⁺, He⁺, O⁺) interacting with obliquely propagating EMIC waves. Includes an additional wave propagation equation `dkpardt` and the time derivative of the cyclotron frequency `dwcdt`.
+  </Card>
+  <Card title="parallel_EMIC_mod" icon="arrows-left-right">
+    Simplified EMIC-ion interaction for strictly parallel-propagating EMIC waves (wave normal angle = 0). Fewer free parameters, faster to evaluate.
+  </Card>
+</CardGroup>
+
+## Equations of Motion
+
+All three sub-modules expose the same family of ODE right-hand-side functions. The table below describes each one; the `whistler_electron_mod` variants are shown — the EMIC sub-modules have analogous forms with species-appropriate mass and charge.
+
+### Position and Latitude
+
+#### `dzdt(ppar, gamma, m)`
+
+Rate of change of the position along the field line (field-line coordinate `z` in meters):
+
+```
+dz/dt = p‖ / (γ m)
+```
+
+```python
+import WPIT.WPI_mod.whistler_electron_mod as wpi
+import WPIT.Environment_mod as env
+
+dzdt_val = wpi.dzdt(
+    ppar_arg=ppar,
+    gamma_arg=gamma,
+    mi_arg=env.const.me
+)
+```
+
+#### `dlamdadt(ppar, lamda, gamma, L)`
+
+Rate of change of magnetic latitude:
+
+```
+dλ/dt = p‖ / (γ m L Re √(1 + 3sin²λ) cosλ)
+```
+
+### Momentum Evolution
+
+#### `dppardt(pper, eta, wtau_sq, kz, gamma, wce, dwds)`
+
+Rate of change of parallel momentum. The first term is the wave-driven acceleration; the second is the mirror force:
+
+```
+dp‖/dt = (me ω̃τ² / kz) sin η − (p⊥² / 2 me γ wce) × (dwce/ds)
+```
+
+```python
+dpar = wpi.dppardt(
+    pper_arg=pper, eta_arg=eta, wtau_sq_arg=wtausq,
+    kz_arg=kz, gamma_arg=gamma, wce_arg=wce, dwds_arg=dwcds
+)
+```
+
+#### `dpperdt(ppar, pper, eta, w1, w2, beta, gamma, R1, R2, m_res, wce, dwds)`
+
+Rate of change of perpendicular momentum, driven by the wave's right- and left-hand polarization components (w1, w2) weighted by Bessel functions Jₘ₋₁ and Jₘ₊₁ of the FLR parameter β:
+
+```
+dp⊥/dt = −(−1)^(m−1) [w1 (p‖/γ + me R1) Jₘ₋₁(β) − w2 (p‖/γ − me R2) Jₘ₊₁(β)] sin η
+         + (p⊥ p‖ / 2 me γ wce) (dwce/ds)
+```
+
+### Energy and Phase
+
+#### `dEkdt(pper, ppar, eta, m_res, Exw, Eyw, Ezw, beta, gamma)`
+
+Rate of change of kinetic energy. Uses the left- and right-hand electric field components EwL = (Ex − Ey)/2, EwR = (Ex + Ey)/2, and the longitudinal component Ez, all weighted by Bessel functions:
+
+```python
+dEk = wpi.dEkdt(
+    pper_arg=pper, ppar_arg=ppar, eta_arg=eta,
+    m_res_arg=m_res, Exw_arg=Exw, Eyw_arg=Eyw, Ezw_arg=Ezw,
+    beta_arg=beta, gamma_arg=gamma
+)
+```
+
+#### `dgammadt(pper, ppar, eta, m_res, Exw, Eyw, Ezw, beta, gamma)`
+
+Rate of change of the Lorentz factor γ. Identical structure to `dEkdt` but divided by an additional factor of me c²:
+
+```
+dγ/dt = (qe / γ me² c²) (−1)^(m−1) [p‖ Ez Jₘ(β) − p⊥ EwL Jₘ₊₁(β) − p⊥ EwR Jₘ₋₁(β)] sin η
+```
+
+#### `detadt(ppar, m_res, wce, w_wave, gamma, kz)`
+
+Rate of change of the wave-particle phase angle η — the key quantity that determines whether the interaction is accelerating or decelerating:
+
+```
+dη/dt = (m wce / γ) − ω_wave − kz (p‖ / me γ)
+```
+
+When dη/dt ≈ 0 and |η| remains bounded, the particle is in cyclotron resonance with the wave.
+
+### Pitch Angle
+
+#### `dalphadt(pper, ppar, eta, w1, w2, R1, R2, wtau_sq, kz, beta, m_res, gamma, wce, dwhds)`
+
+Rate of change of the local pitch angle α, derived from the momentum equations:
+
+```
+dα/dt = (1/p²) [p‖ (dp⊥/dt) − p⊥ (dp‖/dt)]
+```
+
+#### `daeqdt(ppar, pper, alpha, aeq, eta, w1, R1, w2, R2, gamma, beta, wtausq, kz, m_res)`
+
+Rate of change of the equatorial pitch angle αeq, accounting for the adiabatic invariant relationship between local and equatorial pitch angles:
+
+```
+dαeq/dt = −(1/p²) (tan αeq / tan α) [(−1)^(m−1) (w1 (p‖/γ + me R1) Jₘ₋₁(β) − w2 (p‖/γ − me R2) Jₘ₊₁(β)) p‖
+           + ω̃τ² me p⊥ / kz] sin η
+```
+
+## Pre-computation Helper: `wpi_params`
+
+Before calling the ODE functions at each integration step, call `wpi.wpi_params` once to compute the derived wave parameters. This returns the Lorentz factor γ, the wave amplitude parameters w1 and w2, the nonlinear trapping frequency squared ω̃τ², and the polarization ratios R1 and R2:
+
+```python
+gamma, w1, w2, wtau_sq, R1, R2, beta = wpi.wpi_params(
+    m_res_arg=m_res,
+    ppar_arg=ppar,
+    pper_arg=pper,
+    Bxw_arg=Bxw,
+    Byw_arg=Byw,
+    Exw_arg=Exw,
+    Eyw_arg=Eyw,
+    Ezw_arg=Ezw,
+    kz_arg=kappa_par,
+    kx_arg=kappa_per,
+    wce_arg=wce
+)
+```
+
+The FLR parameter β = kx p⊥ / (me γ ωce) quantifies how far the particle strays from the field line during a single gyration — it appears as the argument of the Bessel functions in `dEkdt`, `dpperdt`, etc.
+
+## Nonlinearity Parameters
+
+Whether a wave-particle interaction is in the **linear** (diffusive) or **nonlinear** (trapping) regime is determined by comparing the nonlinear trapping frequency ω̃τ to the rate at which the resonance condition drifts. WPIT provides five functions to characterize this:
+
+### `wpi.nonlinear_S(H, wtsq)` — Nonlinearity Parameter S
+
+```
+S = H / ω̃τ²
+```
+
+When |S| ≪ 1, the interaction is nonlinear (trapping regime). When |S| ≫ 1, it is quasi-linear.
+
+### `wpi.nonlinear_H(pper, ppar, kpar, gamma, m_res, m, wce, dkpar_dt, dwcdz, dwdt)` — Inhomogeneity Factor H
+
+H captures the spatial inhomogeneity of the resonance condition — i.e., how quickly the resonant velocity changes along the field line:
+
+```
+H = (m_res/γ) (dωce/dt) − (p‖/γm) (dkpar/dt) + (kpar p⊥²)/(2γ²m²ωce) (dωce/dz) − dω/dt
+```
+
+### `wpi.nonlinear_C0(ppar, m_res, wce, kz, gamma, Ezw)` — Parallel Phase Trapping Parameter C0
+
+C0 quantifies the contribution of the parallel electric field Ez to the phase-trapping force:
+
+```
+C0 = −(−1)^(m−1) [qe kz/(γ me) + τ qe p‖/(γ³ me² c²)] Ezw
+```
+
+where τ = m ωce − kz p‖/me.
+
+### `wpi.nonlinear_C1m(pper, ppar, w1, Exw, Eyw, m_res, wce, kz, gamma)` — Left-Hand Coupling C1⁻
+
+```
+C1⁻ = (−1)^(m−1) [τ qe p⊥ EwR/(γ³ me² c²) − p⊥ kz w1/(γ² me)]
+```
+
+### `wpi.nonlinear_C1p(pper, ppar, w2, Exw, Eyw, m_res, wce, kz, gamma)` — Right-Hand Coupling C1⁺
+
+Analogous to C1⁻ but for the right-hand polarization component EwL = (Ex − Ey)/2.
+
+### `wpi.nonlinear_theta(C0, C1p, C1m, m_res, beta)` — Combined Phase Angle Parameter
+
+Combines C0, C1⁺, and C1⁻ weighted by Bessel functions to produce the effective driving amplitude and its magnitude (= ω̃τ²):
+
+```python
+theta_val, wtausq_eff = wpi.nonlinear_theta(C0, C1p, C1m, m_res, beta)
+```
+
+<Accordion title="Linear vs. Nonlinear Interaction Regime">
+
+The **linear regime** (|S| ≫ 1) corresponds to quasi-linear diffusion: the particle samples many wave cycles before the resonance condition drifts significantly, and the net effect is well described by diffusion coefficients in pitch-angle/energy space.
+
+The **nonlinear regime** (|S| ≲ 1) corresponds to phase trapping: the particle is trapped in the wave potential well and can undergo large, coherent changes in energy and pitch angle during a single wave-packet encounter. Chorus wave elements with amplitudes above ~100 pT at L ≈ 5 can push electrons into the nonlinear regime.
+
+WPIT computes S at each integration step so that you can monitor which regime the particle occupies throughout its trajectory.
+</Accordion>
+
+## Typical Integration Loop
+
+A minimal integration using `whistler_electron_mod` looks like:
+
+```python
+import numpy as np
+from scipy.integrate import odeint
+import WPIT.Environment_mod as env
+import WPIT.WaveProperties_mod as wave
+import WPIT.WPI_mod.whistler_electron_mod as wpi
+
+# --- Initial conditions ---
+L     = 5.0
+lamda = 0.0                         # start at equator
+Ek_keV = 168.0                      # kinetic energy in keV
+aeq   = np.deg2rad(68.0)            # equatorial pitch angle
+
+B_eq  = env.Bmag_dipole(L, 0.0)
+wce   = env.omega_cyclotron(B_eq, env.const.qe, env.const.me)
+ne, _, _ = env.density_equ_sheeley(L)
+wpe   = env.omega_plasma(ne * 1e6, env.const.qe, env.const.me)
+
+# Wave parameters
+f_wave = 2000.0                     # Hz
+w      = 2 * np.pi * f_wave
+theta  = 0.0                        # parallel propagation
+Byw    = 65e-12                     # 65 pT wave amplitude
+m_res  = -1                         # first cyclotron harmonic
+
+_, _, mu, kappa, kpar, kper = wave.refr_index_appleton(w, wpe, wce, theta)
+S, D, P, R, L_s = wave.stix_parameters(w, ne*1e6, 0, 0, 0, B_eq)
+Bxw, Byw_out, Bzw, Exw, Eyw, Ezw = wave.wave_amplitudes_bell(mu, P, D, S, Byw, theta)
+
+# Convert energy and pitch angle to momenta
+Ek = Ek_keV * 1e3 * env.const.qe   # J
+alpha = env.aeq2alpha(aeq, L, lamda)
+ppar, pper = env.initial_velocity(Ek, alpha, env.const.me)
+
+# Initial phase
+eta0 = 0.0
+z0   = 0.0
+
+# State vector: [z, lamda, ppar, pper, eta]
+y0 = [z0, lamda, ppar, pper, eta0]
+
+print("Initial state:", y0)
+# Pass y0 to scipy.integrate.odeint with your custom RHS function
+# that calls the wpi.dXXXdt functions at each step.
+```
+
+<Note>
+WPIT provides the individual ODE right-hand-side functions but does not ship a pre-built integration driver. The `Module_descriptions/whistler_electron_mod_description.ipynb` notebook shows a complete integration loop using `scipy.integrate.odeint`.
+</Note>

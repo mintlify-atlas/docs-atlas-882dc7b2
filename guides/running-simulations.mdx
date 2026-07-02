@@ -1,0 +1,286 @@
+---
+title: "Running Whistler-Electron Test-Particle Simulations"
+sidebarTitle: "Simulations"
+description: "Step-by-step guide to setting up and integrating gyro-averaged equations of motion for whistler-mode wave-particle interactions using WPIT's Python modules."
+---
+
+WPIT provides a complete set of Python routines for modelling the interaction of energetic electrons with whistler-mode waves through test-particle simulations. Rather than a monolithic solver, WPIT is structured as a library of composable functions — you configure the magnetospheric environment, compute the local wave properties, initialise the particle state, and then integrate the gyro-averaged equations of motion using any SciPy integrator. This page walks through the full workflow from environment setup to producing a trajectory.
+
+## Module overview
+
+<CardGroup cols={2}>
+  <Card title="Environment_mod" icon="globe">
+    Plasma densities, geomagnetic field, cyclotron and plasma frequencies, particle initialisation, and adiabatic invariants.
+  </Card>
+  <Card title="WaveProperties_mod" icon="wave-square">
+    Cold and warm plasma dispersion relations, Stix parameters, refractive index, wave amplitude components, and resonance angles.
+  </Card>
+  <Card title="whistler_electron_mod" icon="bolt">
+    Gyro-averaged equations of motion (9 ODEs) and WPI parameter calculation for whistler-mode electron interactions.
+  </Card>
+  <Card title="WPI_mod / EMIC_ion_mod" icon="atom">
+    Parallel set of equations for electromagnetic ion cyclotron (EMIC) wave interactions with ring-current ions.
+  </Card>
+</CardGroup>
+
+## Full simulation walkthrough
+
+<Steps>
+
+### Set up the magnetospheric environment
+
+Begin by specifying the L-shell and magnetic latitude, then compute the ambient geomagnetic field and plasma densities. All environment utilities live in `WPIT.Environment_mod`.
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+# --- Location ---
+L    = 5.0                          # L-shell
+lamda = 0.0                         # magnetic latitude (rad)
+
+# --- Geomagnetic field (dipole model) ---
+B0 = env.Bmag_dipole(L, lamda)      # returns field magnitude in T
+print(f"B0 = {B0:.3e} T")
+
+# --- Electron density (Sheeley et al. 2001 empirical model) ---
+# Returns mean, min, max in cm^-3
+ne_mean, ne_min, ne_max = env.density_equ_sheeley(L)
+Ne = ne_mean * 1e6                  # convert to m^-3
+
+# --- Characteristic frequencies ---
+wce = env.omega_cyclotron(B0, env.const.qe, env.const.me)   # electron gyrofrequency (rad/s)
+wpe = env.omega_plasma(Ne, env.const.qe, env.const.me)       # electron plasma frequency (rad/s)
+print(f"wce = {wce:.3e} rad/s,  wpe = {wpe:.3e} rad/s")
+```
+
+<Note>
+`density_equ_sheeley` returns densities in **cm⁻³**. Multiply by `1e6` to convert to SI units (m⁻³) before passing to frequency or wave-property routines.
+</Note>
+
+### Compute wave properties
+
+Use `stix_parameters` to obtain the cold-plasma Stix parameters (S, D, P, R, L), then `refr_index_appleton` for the refractive index and wave numbers, and finally `wave_amplitudes_bell` for the six electromagnetic field components of the wave.
+
+```python
+import WPIT.WaveProperties_mod as wave
+
+# --- Wave frequency and normal angle ---
+fwave   = 2000.0                          # wave frequency in Hz
+wwave   = 2 * np.pi * fwave               # angular frequency (rad/s)
+theta   = np.deg2rad(0.0)                 # wave normal angle (rad)
+
+# Ion densities — set to 0 for a simple electron-only plasma
+NH = NHe = NO = 0.0
+
+# Stix cold-plasma parameters (S, D, P, R, L)
+S, D, P, R_s, L_s = wave.stix_parameters(wwave, Ne, NH, NHe, NO, B0)
+
+# Refractive index (Appleton–Hartree, parallel propagation)
+eta_sq_plus, eta_sq_minus, refr_ind, kappa, kpar, kper = \
+    wave.refr_index_appleton(wwave, wpe, wce, theta)
+
+# Wave amplitude components (Bell 1984 polarisation relations)
+Byw = 1e-10                              # wave magnetic amplitude (T)
+Bxw, Byw, Bzw, Exw, Eyw, Ezw = \
+    wave.wave_amplitudes_bell(refr_ind, P, D, S, Byw, theta)
+```
+
+<Tip>
+WPIT also provides `refr_index_full` (full cold-plasma dispersion) and `refr_index_warm` (warm-plasma correction) if you need beyond the Appleton–Hartree approximation.
+</Tip>
+
+### Initialise the particle state
+
+Convert an energy (in keV) and local pitch angle (in rad) to relativistic momenta and the Lorentz factor using `initial_velocity`. These four scalars become the initial conditions for the ODE integrator.
+
+```python
+Ekev  = 100.0                          # particle energy in keV
+alpha = np.deg2rad(60.0)               # local pitch angle
+
+upar0, uper0, ppar0, pper0, gamma0 = \
+    env.initial_velocity(Ekev, alpha, env.const.me)
+
+print(f"ppar0 = {ppar0:.3e} kg·m/s")
+print(f"pper0 = {pper0:.3e} kg·m/s")
+print(f"gamma0 = {gamma0:.6f}")
+```
+
+Next, compute the WPI interaction parameters that appear in the equations of motion. `wpi_params` (from `whistler_electron_mod`) returns the Lorentz factor, the coupling frequencies w1 and w2, the trapping frequency squared, the polarisation ratios R1 and R2, and the finite-Larmor-radius parameter beta.
+
+```python
+import WPIT.WPI_mod.whistler_electron_mod as wpi_mod
+
+m_res = 1   # resonance order (fundamental cyclotron resonance)
+
+gamma, w1, w2, wtau_sq, R1, R2, beta = wpi_mod.wpi_params(
+    m_res, ppar0, pper0,
+    Bxw, Byw, Exw, Eyw, Ezw,
+    kpar, kper, wce
+)
+```
+
+| Return value | Symbol | Meaning |
+|---|---|---|
+| `gamma` | γ | Lorentz factor |
+| `w1` | ω₁ | RH coupling frequency (Bortnik thesis Eq. 2.25e) |
+| `w2` | ω₂ | LH coupling frequency (Bortnik thesis Eq. 2.25e) |
+| `wtau_sq` | ω²_τ | Trapping frequency squared (Bortnik thesis Eq. 2.25c) |
+| `R1` | R₁ | Electric-to-magnetic polarisation ratio, RH component |
+| `R2` | R₂ | Electric-to-magnetic polarisation ratio, LH component |
+| `beta` | β | Finite-Larmor-radius argument (Bortnik thesis Eq. 2.25a) |
+
+### Define the equations of motion
+
+WPIT implements 9 coupled gyro-averaged ODEs for the whistler-electron interaction. Each is an individual callable that returns a scalar derivative.
+
+| Function | Returns | Equation |
+|---|---|---|
+| `dzdt(ppar, gamma, me)` | dz/dt | Parallel spatial velocity |
+| `dlamdadt(ppar, lamda, gamma, L)` | dλ/dt | Rate of change of magnetic latitude |
+| `dppardt(pper, eta, wtau_sq, kz, gamma, wce, dwds)` | dp‖/dt | Parallel momentum |
+| `dpperdt(ppar, pper, eta, w1, w2, beta, gamma, R1, R2, m_res, wce, dwds)` | dp⊥/dt | Perpendicular momentum |
+| `dEkdt(pper, ppar, eta, m_res, Exw, Eyw, Ezw, beta, gamma)` | dEk/dt | Kinetic energy |
+| `dgammadt(pper, ppar, eta, m_res, Exw, Eyw, Ezw, beta, gamma)` | dγ/dt | Lorentz factor |
+| `dalphadt(pper, ppar, eta, w1, w2, R1, R2, wtau_sq, kz, beta, m_res, gamma, wce, dwhds)` | dα/dt | Local pitch angle |
+| `daeqdt(ppar, pper, alpha, aeq, eta, w1, R1, w2, R2, gamma, beta, wtausq, kz, m_res)` | dα_eq/dt | Equatorial pitch angle |
+| `detadt(ppar, m_res, wce, wwave, gamma, kz)` | dη/dt | Wave-particle phase angle |
+
+```python
+# Precompute spatial gradient of B (needed for drift and mirror terms)
+dB = env.dB_ds(L, lamda)   # dB/ds along field line
+
+# Example: evaluate all derivatives at t=0 for state
+# state = [z, lamda, ppar, pper, Ek, gamma, alpha, aeq, eta]
+z0    = 0.0
+lamda0 = 0.0
+aeq0  = alpha          # equatorial pitch angle (≈ local at equator)
+eta0  = 0.0            # initial phase angle
+
+dzdt_val     = wpi_mod.dzdt(ppar0, gamma0, env.const.me)
+dlamdadt_val = wpi_mod.dlamdadt(ppar0, lamda0, gamma0, L)
+dppardt_val  = wpi_mod.dppardt(pper0, eta0, wtau_sq, kpar, gamma0, wce, dB)
+dpperdt_val  = wpi_mod.dpperdt(ppar0, pper0, eta0, w1, w2, beta,
+                                gamma0, R1, R2, m_res, wce, dB)
+detadt_val   = wpi_mod.detadt(ppar0, m_res, wce, wwave, gamma0, kpar)
+```
+
+### Integrate with SciPy
+
+Bundle all derivatives into a single ODE system function and integrate with `scipy.integrate.solve_ivp`.
+
+```python
+from scipy.integrate import solve_ivp
+
+def equations_of_motion(t, state):
+    z_, lamda_, ppar_, pper_, Ek_, gam_, alpha_, aeq_, eta_ = state
+
+    # Recompute environment at new position
+    B_    = env.Bmag_dipole(L, lamda_)
+    wce_  = env.omega_cyclotron(B_, env.const.qe, env.const.me)
+    dB_   = env.dB_ds(L, lamda_)
+
+    # Recompute wave parameters at current momentum
+    _, w1_, w2_, wtau_sq_, R1_, R2_, beta_ = wpi_mod.wpi_params(
+        m_res, ppar_, pper_, Bxw, Byw, Exw, Eyw, Ezw, kpar, kper, wce_
+    )
+
+    dz      = wpi_mod.dzdt(ppar_, gam_, env.const.me)
+    dlam    = wpi_mod.dlamdadt(ppar_, lamda_, gam_, L)
+    dppar   = wpi_mod.dppardt(pper_, eta_, wtau_sq_, kpar, gam_, wce_, dB_)
+    dpper   = wpi_mod.dpperdt(ppar_, pper_, eta_, w1_, w2_, beta_,
+                               gam_, R1_, R2_, m_res, wce_, dB_)
+    dEk     = wpi_mod.dEkdt(pper_, ppar_, eta_, m_res, Exw, Eyw, Ezw, beta_, gam_)
+    dgamma  = wpi_mod.dgammadt(pper_, ppar_, eta_, m_res, Exw, Eyw, Ezw, beta_, gam_)
+    dalpha  = wpi_mod.dalphadt(pper_, ppar_, eta_, w1_, w2_, R1_, R2_,
+                                wtau_sq_, kpar, beta_, m_res, gam_, wce_, dB_)
+    daeq    = wpi_mod.daeqdt(ppar_, pper_, alpha_, aeq_, eta_, w1_, R1_,
+                              w2_, R2_, gam_, beta_, wtau_sq_, kpar, m_res)
+    deta    = wpi_mod.detadt(ppar_, m_res, wce_, wwave, gam_, kpar)
+
+    return [dz, dlam, dppar, dpper, dEk, dgamma, dalpha, daeq, deta]
+
+# Initial state vector
+state0 = [z0, lamda0, ppar0, pper0,
+          Ekev * 1e3 * env.const.qe,   # energy in Joules
+          gamma0, alpha, aeq0, eta0]
+
+# Integration time span
+t_span = (0.0, 0.5)       # seconds
+t_eval = np.linspace(0, 0.5, 5000)
+
+sol = solve_ivp(equations_of_motion, t_span, state0,
+                method='RK45', t_eval=t_eval,
+                rtol=1e-8, atol=1e-10)
+
+# Unpack results
+z_sol, lamda_sol, ppar_sol, pper_sol = sol.y[0], sol.y[1], sol.y[2], sol.y[3]
+Ek_sol, gamma_sol, alpha_sol         = sol.y[4], sol.y[5], sol.y[6]
+aeq_sol, eta_sol                     = sol.y[7], sol.y[8]
+```
+
+<Warning>
+The equations of motion assume that the wave field amplitudes (`Bxw`, `Byw`, `Exw`, `Eyw`, `Ezw`) and wave numbers (`kpar`, `kper`) are prescribed constants, as is typical for single-wave test-particle studies. For realistic wave packets use `wave_packet_gauss`, `wave_packet_one_sided`, or `wave_packet_two_sided` from `WaveProperties_mod` to modulate the amplitude as a function of position.
+</Warning>
+
+### Plot the trajectory
+
+```python
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+
+axes[0, 0].plot(sol.t, np.rad2deg(alpha_sol))
+axes[0, 0].set_xlabel("Time (s)")
+axes[0, 0].set_ylabel("Pitch angle α (deg)")
+
+axes[0, 1].plot(sol.t, Ek_sol / (1e3 * env.const.qe))
+axes[0, 1].set_xlabel("Time (s)")
+axes[0, 1].set_ylabel("Kinetic energy (keV)")
+
+axes[1, 0].plot(sol.t, np.rad2deg(aeq_sol))
+axes[1, 0].set_xlabel("Time (s)")
+axes[1, 0].set_ylabel("Equatorial pitch angle α_eq (deg)")
+
+axes[1, 1].plot(sol.t, eta_sol % (2 * np.pi))
+axes[1, 1].set_xlabel("Time (s)")
+axes[1, 1].set_ylabel("Phase angle η (rad)")
+
+plt.tight_layout()
+plt.show()
+```
+
+</Steps>
+
+## Key physical constants
+
+All physical constants are accessible through `WPIT.Environment_mod.const`:
+
+```python
+import WPIT.Environment_mod as env
+
+env.const.me        # electron rest mass (kg)
+env.const.qe        # elementary charge (C)
+env.const.c_light   # speed of light (m/s)
+env.const.epsilon0  # permittivity of free space (F/m)
+env.const.mH        # hydrogen ion mass (kg)
+env.const.mHe       # helium ion mass (kg)
+env.const.mO        # oxygen ion mass (kg)
+env.const.Re        # Earth radius (m)
+```
+
+<Accordion title="Using odeint instead of solve_ivp">
+If you prefer the legacy `scipy.integrate.odeint` interface (which expects the state derivative in `(state, t)` order), wrap the equations accordingly:
+
+```python
+from scipy.integrate import odeint
+
+def eom_odeint(state, t):
+    return equations_of_motion(t, state)
+
+t_arr = np.linspace(0, 0.5, 5000)
+sol_odeint = odeint(eom_odeint, state0, t_arr, rtol=1e-8, atol=1e-10)
+```
+
+`odeint` uses LSODA internally and can switch between stiff and non-stiff methods automatically, which is useful if the wave-particle interaction becomes impulsive.
+</Accordion>

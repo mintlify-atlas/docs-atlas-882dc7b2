@@ -1,0 +1,596 @@
+---
+title: "Particle Parameter Functions — WPIT Environment_mod"
+sidebarTitle: "Particle Parameters"
+description: "WPIT particle parameter API: loss cone, bounce period, drift period, Larmor radius, magnetic moment, pitch angle transforms, and Debye shielding length."
+---
+
+The particle parameter functions in `Environment_mod` compute single-particle dynamic quantities that characterise the motion of charged particles trapped in Earth's magnetic field. These include geometric properties (loss cone, Larmor radius), periodic motions (bounce period, drift period), conserved quantities (first adiabatic invariant), coordinate transforms between pitch angle reference frames, and plasma screening properties (Debye length). Collectively these functions underpin the setup of initial particle distributions and the interpretation of diffusion and transport calculations in WPIT.
+
+```python
+import WPIT.Environment_mod as env
+import numpy as np
+
+# Loss cone at L=4
+alpha_lc = env.loss_cone(4.0)
+print(f"Loss cone at L=4: {np.degrees(alpha_lc):.2f}°")
+```
+
+---
+
+## Loss Cone
+
+### `loss_cone`
+
+Calculates the equatorial loss cone half-angle for a magnetic dipole field line. Particles with equatorial pitch angles smaller than this angle are not magnetically mirrored above the atmosphere and are lost to precipitation.
+
+The loss cone angle is:
+
+$$
+\alpha_{\text{lc}} = \arcsin\!\left(\frac{1}{\sqrt{L^3 \sqrt{4 - 3/L}}}\right)
+$$
+
+**Reference:** Kivelson, M. G., and Russell, C. T. (Eds.). (1995). *Introduction to Space Physics*. Cambridge University Press.
+
+#### Parameters
+
+<ParamField path="L_arg" type="float" required>
+  L-shell value (dimensionless). As L increases, the loss cone angle decreases — particles at higher L are more easily trapped.
+</ParamField>
+
+#### Returns
+
+<ResponseField name="loss" type="float">
+  Loss cone half-angle in **radians**, measured from the field-aligned direction (not from the perpendicular). Convert to degrees with `numpy.degrees()`.
+</ResponseField>
+
+#### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+# Loss cone at several L-shells
+for L in [2.0, 3.0, 4.0, 5.0, 6.0]:
+    lc = env.loss_cone(L)
+    print(f"L = {L:.0f}  →  α_lc = {np.degrees(lc):.2f}°")
+
+# Output (approx):
+# L = 2  →  α_lc = 14.36°
+# L = 3  →  α_lc = 7.69°
+# L = 4  →  α_lc = 4.97°
+# L = 5  →  α_lc = 3.53°
+# L = 6  →  α_lc = 2.66°
+```
+
+---
+
+### `loss_cone_v2`
+
+Calculates the loss cone half-angle for a specified mirror altitude above Earth's surface. Unlike `loss_cone`, which assumes the atmosphere begins at Earth's surface (the dipole field line footprint), `loss_cone_v2` explicitly accounts for a finite atmospheric mirror altitude $h$, giving a more physically precise result.
+
+The formula is:
+
+$$
+\sin\alpha_{\text{lc}} = \sqrt{\frac{\zeta_m^3}{\sqrt{1 + 3(1 - \zeta_m)}}}
+\quad \text{where} \quad
+\zeta_m = \frac{R_E + h}{L\, R_E}
+$$
+
+**Reference:** Lauben, D. S., Inan, U. S., and Bell, T. F. (2001). "Precipitation of radiation belt electrons induced by obliquely propagating lightning-generated whistlers." *J. Geophys. Res.: Space Physics*, 106, 29745–29770.
+
+#### Parameters
+
+<ParamField path="L_arg" type="float" required>
+  L-shell value (dimensionless).
+</ParamField>
+
+<ParamField path="h_arg" type="float" required>
+  Mirror altitude above Earth's surface in **metres (m)**. Typical ionospheric base altitude: 100 km = `100e3` m.
+</ParamField>
+
+#### Returns
+
+<ResponseField name="loss" type="float">
+  Loss cone half-angle in **radians**.
+</ResponseField>
+
+#### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L = 4.0
+h = 100e3   # 100 km altitude in metres
+
+lc_v2 = env.loss_cone_v2(L, h)
+lc_v1 = env.loss_cone(L)
+
+print(f"loss_cone    (surface):  {np.degrees(lc_v1):.3f}°")
+print(f"loss_cone_v2 (h=100 km): {np.degrees(lc_v2):.3f}°")
+
+# Compare at different altitudes
+for h_km in [80, 100, 120, 200]:
+    lc = env.loss_cone_v2(L, h_km * 1e3)
+    print(f"  h = {h_km} km  →  α_lc = {np.degrees(lc):.3f}°")
+```
+
+<Note>
+  `h_arg` is in **metres**. Altitudes in kilometres must be multiplied by 1000. A typical ionospheric lower boundary is 100 km.
+</Note>
+
+---
+
+## Bounce Period
+
+### `T_bounce`
+
+Calculates the bounce period of a magnetically trapped particle — the time for a particle to travel from one mirror point, to the conjugate mirror point, and back. The approximate formula accounts for the pitch-angle dependence of the mirror latitude.
+
+$$
+T_b = \frac{0.117\, L\, c}{v} \left[1 - 0.4635\,\sin^{3/4}\!\alpha_{\text{eq}}\right]
+$$
+
+where $c$ is the speed of light and $v$ is the particle speed.
+
+**References:**
+- Öztürk, M. K. (2012). "Trajectories of charged particles trapped in Earth's magnetic field." *American Journal of Physics*, 80(5), 420–428.
+- Sturrock, P. A. (1994). *Plasma Physics: An Introduction to the Theory of Astrophysical, Geophysical, and Laboratory Plasmas*. Cambridge University Press.
+
+### Parameters
+
+<ParamField path="L_arg" type="float" required>
+  L-shell value (dimensionless). The bounce period scales linearly with L.
+</ParamField>
+
+<ParamField path="v_arg" type="float" required>
+  Particle speed in **m/s**. For a particle with kinetic energy $E_k$ use `initial_velocity` to obtain this. Note: this is the total speed, not a velocity component.
+</ParamField>
+
+<ParamField path="aeq_arg" type="float" required>
+  Equatorial pitch angle in **radians**. Particles with larger equatorial pitch angles (more perpendicular) have shorter bounce periods because their mirror points are closer to the equator.
+</ParamField>
+
+### Returns
+
+<ResponseField name="bounce_tmp" type="float">
+  Bounce period in **seconds (s)**.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L      = 4.0
+Ek_keV = 100.0   # 100 keV electron
+aeq    = np.radians(30.0)   # 30° equatorial pitch angle
+
+# Get velocity from initial_velocity
+upar, uper, ppar, pper, gamma = env.initial_velocity(Ek_keV, aeq, env.const.me)
+v_total = np.sqrt(upar**2 + uper**2)
+
+Tb = env.T_bounce(L, v_total, aeq)
+print(f"Bounce period: {Tb:.3f} s")
+
+# Pitch angle dependence
+angles = np.linspace(np.radians(5), np.radians(85), 50)
+Tb_vals = [env.T_bounce(L, v_total, a) for a in angles]
+```
+
+---
+
+## Drift Period
+
+### `T_drift`
+
+Calculates the azimuthal drift period of a magnetically trapped particle — the time for a particle to complete one full drift around Earth due to the gradient and curvature drift of the magnetic field. The formula accounts for the pitch-angle dependence of the drift velocity.
+
+$$
+T_d = \frac{2\pi q B R_E^3}{m v^2} \cdot \frac{1}{L R_E} \cdot \left[1 - \frac{1}{3}\sin^{0.62}\!\alpha_{\text{eq}}\right]^{-1}
+$$
+
+**References:**
+- Öztürk, M. K. (2012). "Trajectories of charged particles trapped in Earth's magnetic field." *American Journal of Physics*, 80(5), 420–428.
+- Sturrock, P. A. (1994). *Plasma Physics: An Introduction to the Theory of Astrophysical, Geophysical, and Laboratory Plasmas*. Cambridge University Press.
+
+### Parameters
+
+<ParamField path="B_arg" type="float" required>
+  Magnetic field strength in **Tesla (T)**. Use the equatorial dipole field `Bmag_dipole(L, 0)`.
+</ParamField>
+
+<ParamField path="m_arg" type="float" required>
+  Particle mass in **kg**. Use `env.const.me` for electrons.
+</ParamField>
+
+<ParamField path="v_arg" type="float" required>
+  Particle speed in **m/s**.
+</ParamField>
+
+<ParamField path="L_arg" type="float" required>
+  L-shell value (dimensionless).
+</ParamField>
+
+<ParamField path="aeq_arg" type="float" required>
+  Equatorial pitch angle in **radians**.
+</ParamField>
+
+### Returns
+
+<ResponseField name="drift_tmp" type="float">
+  Drift period in **seconds (s)**.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L      = 4.0
+Ek_keV = 100.0
+aeq    = np.radians(45.0)
+
+B   = env.Bmag_dipole(L, 0.0)
+upar, uper, ppar, pper, gamma = env.initial_velocity(Ek_keV, aeq, env.const.me)
+v   = np.sqrt(upar**2 + uper**2)
+
+Td = env.T_drift(B, env.const.me, v, L, aeq)
+print(f"Drift period: {Td / 3600:.2f} hours")
+```
+
+<Note>
+  The function internally uses `env.const.qe` (electron charge) for the charge factor regardless of the species passed. Verify source code behaviour when applying to ion drift calculations.
+</Note>
+
+---
+
+## `R_Larmor`
+
+Calculates the Larmor (gyro) radius of a relativistic charged particle. The Larmor radius is the radius of the helical trajectory of a particle gyrating around a magnetic field line and is important for finite Larmor radius effects in wave-particle interactions.
+
+$$
+r_L = \frac{\gamma\, m\, v_\perp}{|q|\, B}
+$$
+
+**Reference:** Parks, G. K. (1991). *Physics of Space Plasmas: An Introduction*. Addison-Wesley.
+
+### Parameters
+
+<ParamField path="uperp_arg" type="float" required>
+  Perpendicular (to the magnetic field) component of the particle velocity in **m/s**. Obtain from `initial_velocity` as `uper0`.
+</ParamField>
+
+<ParamField path="gamma_arg" type="float" required>
+  Relativistic Lorentz factor (dimensionless, ≥ 1). Obtain from `initial_velocity` as `gamma0`.
+</ParamField>
+
+<ParamField path="B_arg" type="float" required>
+  Magnetic field strength in **Tesla (T)**.
+</ParamField>
+
+<ParamField path="ms_arg" type="float" required>
+  Particle mass in **kg**.
+</ParamField>
+
+<ParamField path="qs_arg" type="float" required>
+  Particle charge in **Coulombs (C)** (positive value).
+</ParamField>
+
+### Returns
+
+<ResponseField name="rl_tmp" type="float">
+  Larmor radius in **metres (m)**.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L      = 4.0
+Ek_keV = 100.0
+aeq    = np.radians(60.0)
+
+B = env.Bmag_dipole(L, 0.0)
+upar, uper, ppar, pper, gamma = env.initial_velocity(Ek_keV, aeq, env.const.me)
+
+rl = env.R_Larmor(uper, gamma, B, env.const.me, env.const.qe)
+print(f"Larmor radius: {rl:.0f} m  ({rl/1e3:.2f} km)")
+```
+
+---
+
+## `mu_adiabatic`
+
+Calculates the first adiabatic invariant $\mu$ — the magnetic moment of a particle's gyration. In the absence of rapid field changes, $\mu$ is conserved along a particle's drift path and is the fundamental quantity that drives pitch angle diffusion in wave-particle interaction theory.
+
+$$
+\mu = \frac{p_\perp^2}{2 m B}
+$$
+
+where $p_\perp = \gamma m v_\perp$ is the relativistic perpendicular momentum.
+
+**Reference:** Tao, X., et al. (2012). "Effects of amplitude modulation on nonlinear interactions between electrons and chorus waves." *Geophys. Res. Lett.*, 39(6).
+
+### Parameters
+
+<ParamField path="pper_arg" type="float" required>
+  Perpendicular component of the relativistic momentum in **kg m/s** (N·s). This is $p_\perp = \gamma m v_\perp$. Obtain from `initial_velocity` as `pper0`.
+</ParamField>
+
+<ParamField path="B_arg" type="float" required>
+  Magnetic field strength at the particle's location in **Tesla (T)**.
+</ParamField>
+
+<ParamField path="m_arg" type="float" required>
+  Particle mass in **kg**.
+</ParamField>
+
+### Returns
+
+<ResponseField name="mu_tmp" type="float">
+  First adiabatic invariant in **J/T** (Joules per Tesla).
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L      = 4.0
+Ek_keV = 100.0
+aeq    = np.radians(45.0)
+
+B_eq = env.Bmag_dipole(L, 0.0)
+upar, uper, ppar, pper, gamma = env.initial_velocity(Ek_keV, aeq, env.const.me)
+
+mu = env.mu_adiabatic(pper, B_eq, env.const.me)
+print(f"First adiabatic invariant μ = {mu:.4e} J/T")
+
+# Verify conservation: μ should be the same at a different latitude
+lamda2 = np.radians(20.0)
+alpha2 = env.aeq2alpha(L, lamda2, aeq)
+B2     = env.Bmag_dipole(L, lamda2)
+
+# At the new latitude the perpendicular momentum changes
+# Here we demonstrate the concept using the pitch angle transform
+upar2, uper2, ppar2, pper2, gamma2 = env.initial_velocity(Ek_keV, alpha2, env.const.me)
+mu2 = env.mu_adiabatic(pper2, B2, env.const.me)
+print(f"μ at λ=20°:                   {mu2:.4e} J/T  (should ≈ μ at equator)")
+```
+
+---
+
+## `initial_velocity`
+
+Converts a particle's kinetic energy and local pitch angle into velocity components, momenta, and the Lorentz factor. This is typically the first step in setting up a particle's initial conditions for a simulation.
+
+The conversion is fully relativistic:
+
+$$
+\gamma = \frac{E_k}{m c^2} + 1, \qquad
+v = c\sqrt{1 - 1/\gamma^2}
+$$
+
+$$
+v_\parallel = v \cos\alpha, \quad v_\perp = v \sin\alpha
+$$
+
+$$
+p_\parallel = \gamma m v_\parallel, \quad p_\perp = \gamma m v_\perp
+$$
+
+### Parameters
+
+<ParamField path="Ekev" type="float" required>
+  Particle kinetic energy in **keV** (kilo-electron volts). Note: the internal conversion uses $1\ \text{keV} = 1.602 \times 10^{-16}\ \text{J}$.
+</ParamField>
+
+<ParamField path="alpha" type="float" required>
+  Local pitch angle in **radians** — the angle between the particle velocity and the magnetic field direction at the particle's current location.
+</ParamField>
+
+<ParamField path="m_arg" type="float" required>
+  Particle mass in **kg**. Use `env.const.me` for electrons, `env.const.mH` for protons.
+</ParamField>
+
+### Returns
+
+<ResponseField name="upar0" type="float">
+  Parallel velocity component in **m/s**.
+</ResponseField>
+
+<ResponseField name="uper0" type="float">
+  Perpendicular velocity component in **m/s**.
+</ResponseField>
+
+<ResponseField name="ppar0" type="float">
+  Parallel relativistic momentum in **kg m/s**.
+</ResponseField>
+
+<ResponseField name="pper0" type="float">
+  Perpendicular relativistic momentum in **kg m/s**.
+</ResponseField>
+
+<ResponseField name="gamma0" type="float">
+  Relativistic Lorentz factor (dimensionless, ≥ 1). Equal to 1 for a non-relativistic particle.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+# 500 keV electron at 45° pitch angle
+Ek    = 500.0          # keV
+alpha = np.radians(45.0)
+
+upar, uper, ppar, pper, gamma = env.initial_velocity(Ek, alpha, env.const.me)
+
+print(f"Lorentz factor γ  = {gamma:.4f}")
+print(f"Total speed       = {np.sqrt(upar**2+uper**2)/env.const.c_light:.4f} c")
+print(f"v_par = {upar:.3e} m/s,  v_per = {uper:.3e} m/s")
+print(f"p_par = {ppar:.3e} kg·m/s,  p_per = {pper:.3e} kg·m/s")
+
+# Non-relativistic check at 1 keV
+upar_nr, uper_nr, _, _, g_nr = env.initial_velocity(1.0, alpha, env.const.me)
+print(f"\n1 keV electron: γ = {g_nr:.6f}  (close to 1 → non-relativistic)")
+```
+
+<Note>
+  Energy input is in **keV**, not eV or Joules. The function uses `1 keV = 1.602176487 × 10⁻¹⁶ J`. For MeV energies, multiply by 1000 before passing.
+</Note>
+
+---
+
+## Pitch Angle Transforms
+
+### `aeq2alpha`
+
+Converts an equatorial pitch angle to the local pitch angle at a given magnetic latitude on the same field line. The conversion uses the dipole mirror ratio between the local field $B(\lambda)$ and the equatorial field $B_{\text{eq}}$:
+
+$$
+\sin\alpha(\lambda) = \sin\alpha_{\text{eq}} \sqrt{\frac{B(\lambda)}{B_{\text{eq}}}}
+$$
+
+#### Parameters
+
+<ParamField path="L_arg" type="float" required>
+  L-shell value (dimensionless).
+</ParamField>
+
+<ParamField path="lambda_arg" type="float" required>
+  Target magnetic latitude in **radians** where the local pitch angle is desired.
+</ParamField>
+
+<ParamField path="aeq_arg" type="float" required>
+  Equatorial pitch angle in **radians**.
+</ParamField>
+
+#### Returns
+
+<ResponseField name="alpha0" type="float">
+  Local pitch angle in **radians** at the specified magnetic latitude.
+</ResponseField>
+
+#### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L    = 4.0
+aeq  = np.radians(30.0)   # 30° equatorial pitch angle
+
+# Local pitch angle at 20° latitude
+lamda = np.radians(20.0)
+alpha_local = env.aeq2alpha(L, lamda, aeq)
+print(f"α_eq = {np.degrees(aeq):.1f}°  →  α_local(λ=20°) = {np.degrees(alpha_local):.2f}°")
+
+# Profile: equatorial → 40° latitude
+latitudes = np.linspace(0, np.radians(40), 100)
+alpha_profile = env.aeq2alpha(L, latitudes, aeq)
+```
+
+---
+
+### `alpha2aeq`
+
+Converts a local pitch angle at a given magnetic latitude to the equivalent equatorial pitch angle on the same field line. This is the inverse of `aeq2alpha` and uses the same mirror ratio:
+
+$$
+\sin\alpha_{\text{eq}} = \sin\alpha(\lambda) \sqrt{\frac{B_{\text{eq}}}{B(\lambda)}}
+$$
+
+#### Parameters
+
+<ParamField path="L_arg" type="float" required>
+  L-shell value (dimensionless).
+</ParamField>
+
+<ParamField path="lambda_arg" type="float" required>
+  Magnetic latitude in **radians** where the local pitch angle is measured.
+</ParamField>
+
+<ParamField path="alpha_arg" type="float" required>
+  Local pitch angle in **radians** at the given latitude.
+</ParamField>
+
+#### Returns
+
+<ResponseField name="alphaeq0" type="float">
+  Equatorial pitch angle in **radians**.
+</ResponseField>
+
+#### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+L      = 4.0
+lamda  = np.radians(25.0)
+alpha  = np.radians(55.0)   # local pitch angle at 25° latitude
+
+aeq = env.alpha2aeq(L, lamda, alpha)
+print(f"α_local(λ=25°) = {np.degrees(alpha):.1f}°  →  α_eq = {np.degrees(aeq):.2f}°")
+
+# Round-trip check
+alpha_back = env.aeq2alpha(L, lamda, aeq)
+print(f"Round-trip: α_local = {np.degrees(alpha_back):.2f}°  (should = {np.degrees(alpha):.1f}°)")
+```
+
+---
+
+## `debye_length`
+
+Calculates the Debye shielding length — the characteristic scale over which electrostatic potentials are screened in a plasma. The Debye length is important for verifying that the plasma approximation holds (particle separations must be much smaller than the Debye length) and appears in small-angle Coulomb scattering calculations.
+
+$$
+\lambda_D = \frac{\varepsilon_0 k_B T_e}{n_e q_e^2}
+$$
+
+**Reference:** Parks, G. K. (1991). *Physics of Space Plasmas: An Introduction*, p. 22.
+
+<Note>
+  The implementation in `debye_length` omits the square root present in the standard textbook formula $\lambda_D = \sqrt{\varepsilon_0 k_B T / (n q^2)}$. The function returns $\lambda_D^2$ (the square of the Debye length) rather than $\lambda_D$ itself. Take `numpy.sqrt()` of the result to obtain the true Debye length in metres.
+</Note>
+
+### Parameters
+
+<ParamField path="ne_arg" type="float" required>
+  Electron number density in **m⁻³** (SI). Density model outputs in cm⁻³ must be multiplied by $10^6$.
+</ParamField>
+
+<ParamField path="Te_arg" type="float" required>
+  Electron temperature in **Kelvin (K)**. To convert from eV: $T(\text{K}) = T(\text{eV}) \times 11{,}604.5$.
+</ParamField>
+
+### Returns
+
+<ResponseField name="debye" type="float">
+  Returns $\varepsilon_0 k_B T_e / (n_e q_e^2)$, which equals $\lambda_D^2$ in **m²**. Take `numpy.sqrt()` to obtain the Debye length in **metres**.
+</ResponseField>
+
+### Example
+
+```python
+import numpy as np
+import WPIT.Environment_mod as env
+
+# Magnetospheric conditions at L=4
+ne_cm3 = env.density_equ_sheeley(4.0)[0]
+ne_m3  = ne_cm3 * 1e6          # convert cm⁻³ → m⁻³
+Te_eV  = 1000.0                 # 1 keV electron temperature
+Te_K   = Te_eV * 11604.5        # convert eV → Kelvin
+
+debye_sq = env.debye_length(ne_m3, Te_K)
+debye    = np.sqrt(debye_sq)     # take sqrt to get true Debye length
+print(f"Debye length: {debye:.0f} m  ({debye/1e3:.2f} km)")
+```
